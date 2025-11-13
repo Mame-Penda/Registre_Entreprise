@@ -1,7 +1,6 @@
 import os
 import base64
 import requests
-import sqlite3
 import secrets
 import json
 import re
@@ -11,14 +10,32 @@ from flask_mail import Mail, Message
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 import pymysql
-from flask import jsonify
 
 pymysql.install_as_MySQLdb()
 load_dotenv()
 
+# Configuration base de données
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
 # Initialiser la base de données au démarrage
-from init_db import init_database
-init_database()
+if DATABASE_URL:
+    # Mode production avec PostgreSQL
+    import psycopg2
+    from init_db import init_database
+    init_database()
+    
+    def get_db_connection():
+        """Connexion PostgreSQL"""
+        return psycopg2.connect(DATABASE_URL)
+else:
+    # Mode développement avec SQLite
+    import sqlite3
+    from init_db import init_database
+    init_database()
+    
+    def get_db_connection():
+        """Connexion SQLite (développement local)"""
+        return sqlite3.connect("users.db")
 
 app = Flask(__name__)
 app.config['DEBUG'] = True
@@ -91,16 +108,25 @@ def get_insee_token() -> str | None:
 
     return token
 
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         email = request.form.get("email")
         password = request.form.get("password")
-        conn = sqlite3.connect("users.db")
+        
+        conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT password FROM users WHERE email = ?", (email,))
+        
+        # Utilise %s pour PostgreSQL, ? pour SQLite (géré automatiquement)
+        if DATABASE_URL:
+            cursor.execute("SELECT password FROM users WHERE email = %s", (email,))
+        else:
+            cursor.execute("SELECT password FROM users WHERE email = ?", (email,))
+            
         user = cursor.fetchone()
         conn.close()
+        
         if user and bcrypt.check_password_hash(user[0], password):
             session["user"] = email
             return redirect(url_for("search_company"))
@@ -113,7 +139,7 @@ def login():
 def register():
     if request.method == "POST":
         name = request.form.get("name")
-        if not name or not re.match(r"^[a-zA-Z\s]+$", name):
+        if not name or not re.match(r"^[a-zA-ZÀ-ÿ\s]+$", name):
             flash("Le nom doit contenir uniquement des lettres et des espaces.", "error")
             return render_template("register.html")
         if len(name) < 2 or len(name) > 50:
@@ -121,7 +147,7 @@ def register():
             return render_template("register.html")
 
         lastname = request.form.get("lastname")
-        if not lastname or not re.match(r"^[a-zA-Z\s]+$", lastname):
+        if not lastname or not re.match(r"^[a-zA-ZÀ-ÿ\s]+$", lastname):
             flash("Le prénom doit contenir uniquement des lettres et des espaces.", "error")
             return render_template("register.html")
         if len(lastname) < 2 or len(lastname) > 50:
@@ -133,22 +159,32 @@ def register():
         password = request.form.get("password")
         hashed_pw = bcrypt.generate_password_hash(password).decode("utf-8")
         
-        conn = sqlite3.connect("users.db")
-        c = conn.cursor()
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
         try:
-            # CORRECTION: Ajout de name et lastname dans l'INSERT
-            c.execute(
-                "INSERT INTO users (name, lastname, email, phone, password) VALUES (?, ?, ?, ?, ?)", 
-                (name, lastname, email, phone, hashed_pw)
-            )
+            if DATABASE_URL:
+                # PostgreSQL
+                cursor.execute(
+                    "INSERT INTO users (name, lastname, email, phone, password) VALUES (%s, %s, %s, %s, %s)", 
+                    (name, lastname, email, phone, hashed_pw)
+                )
+            else:
+                # SQLite
+                cursor.execute(
+                    "INSERT INTO users (name, lastname, email, phone, password) VALUES (?, ?, ?, ?, ?)", 
+                    (name, lastname, email, phone, hashed_pw)
+                )
             conn.commit()
-        except sqlite3.IntegrityError:
+        except Exception as e:
             conn.close()
             flash("Ce numéro ou email est déjà utilisé.", "error")
             return render_template("register.html")
+        
         conn.close()
         session["user"] = phone or email
         return redirect(url_for("search_company"))
+    
     return render_template("register.html")
 
 
@@ -156,46 +192,67 @@ def register():
 def forgot_password():
     if request.method == "POST":
         email = request.form.get("email")
-        conn = sqlite3.connect("users.db")
-        c = conn.cursor()
-        c.execute("SELECT * FROM users WHERE email = ?", (email,))
-        user = c.fetchone()
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        if DATABASE_URL:
+            cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
+        else:
+            cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
+            
+        user = cursor.fetchone()
         conn.close()
+        
         if not user:
             return render_template("forgot_password.html", error="Email introuvable.")
+        
         token = secrets.token_urlsafe(32)
         session['reset_token'] = token
         session['reset_email'] = email
         reset_link = url_for("reset_password", token=token, _external=True)
+        
         msg = Message("Réinitialisation de votre mot de passe", recipients=[email])
         msg.body = f"Bonjour,\n\nVoici votre lien pour réinitialiser le mot de passe : {reset_link}\n\nCe lien est temporaire."
+        
         try:
             mail.send(msg)
             return render_template("forgot_password.html", message="Un lien a été envoyé à votre adresse email.")
         except Exception:
             return render_template("forgot_password.html", error="Erreur lors de l'envoi du mail.")
+    
     return render_template("forgot_password.html")
 
 
 @app.route("/reset-password", methods=["GET", "POST"])
 def reset_password():
     token = request.args.get("token") if request.method == "GET" else request.form.get("token")
+    
     if session.get('reset_token') != token:
         return render_template("reset_password.html", error="Token invalide ou expiré.", token=token)
+    
     if request.method == "POST":
         new_password = request.form.get("new_password")
         if new_password:
             hashed_pw = bcrypt.generate_password_hash(new_password).decode("utf-8")
             email = session.get('reset_email')
-            conn = sqlite3.connect("users.db")
-            c = conn.cursor()
-            c.execute("UPDATE users SET password = ? WHERE email = ?", (hashed_pw, email))
+            
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            if DATABASE_URL:
+                cursor.execute("UPDATE users SET password = %s WHERE email = %s", (hashed_pw, email))
+            else:
+                cursor.execute("UPDATE users SET password = ? WHERE email = ?", (hashed_pw, email))
+                
             conn.commit()
             conn.close()
+            
             session.pop('reset_token', None)
             session.pop('reset_email', None)
             flash("Mot de passe modifié avec succès.")
             return redirect(url_for("login"))
+    
     return render_template("reset_password.html", token=token)
 
 
@@ -251,6 +308,7 @@ def search_company():
 
     return render_template("search.html")
 
+
 def generate_pdf_url(annonce):
     publicationavis = annonce.get("publicationavis", "A")
     parution = annonce.get("parution", "")
@@ -270,6 +328,7 @@ def generate_pdf_url(annonce):
     except requests.RequestException:
         pass
     return url0
+
 
 @app.route("/bodacc", methods=["GET"])
 def bodacc():

@@ -33,18 +33,13 @@ MarkupSafe==3.0.2
 more-itertools==8.10.0
 oauthlib==3.2.0
 packaging==25.0
-pdfkit==1.0.0       # Voir buildpack wkhtmltopdf sur Heroku
+pdfkit==1.0.0
 pycodestyle==2.8.0
 PyJWT==2.3.0
 pymongo==4.12.1
 pyOpenSSL==21.0.0
 pyrsistent==0.18.1
 requests==2.31.0
-Flask==3.1.0
-Flask-Bcrypt==1.0.1
-Flask-CORS==5.0.1
-Flask-JWT-Extended==4.7.1
-Flask-SQLAlchemy==3.1.1
 python-dotenv==1.1.0
-requests==2.31.0
 PyMySQL==1.0.2
+psycopg2-binary==2.9.9

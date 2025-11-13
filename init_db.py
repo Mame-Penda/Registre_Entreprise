@@ -1,32 +1,55 @@
 import os
-import sqlite3
+import psycopg2
 
-# AJOUTEZ CECI TOUT EN HAUT, AVANT TOUT LE RESTE
 def init_database():
-    """Initialise la base de données avec la table users"""
-    db_path = "users.db"
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            lastname TEXT NOT NULL,
-            email TEXT UNIQUE,
-            phone TEXT UNIQUE,
-            password TEXT NOT NULL
-        )
-    ''')
-    conn.commit()
-    conn.close()
-    print(f"✓ Base de données initialisée : {db_path}")
+    """Initialise la base de données PostgreSQL avec la table users"""
+    database_url = os.environ.get('DATABASE_URL')
+    
+    if not database_url:
+        print("❌ DATABASE_URL non définie. Utilisez SQLite en local.")
+        # Fallback SQLite pour développement local
+        import sqlite3
+        conn = sqlite3.connect("users.db")
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                lastname TEXT NOT NULL,
+                email TEXT UNIQUE,
+                phone TEXT UNIQUE,
+                password TEXT NOT NULL
+            )
+        ''')
+        conn.commit()
+        conn.close()
+        print("✓ Base de données SQLite initialisée (mode local)")
+        return
+    
+    try:
+        conn = psycopg2.connect(database_url)
+        cursor = conn.cursor()
+        
+        # Création de la table users pour PostgreSQL
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                lastname VARCHAR(100) NOT NULL,
+                email VARCHAR(255) UNIQUE,
+                phone VARCHAR(20) UNIQUE,
+                password VARCHAR(255) NOT NULL
+            )
+        ''')
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print("✓ Base de données PostgreSQL initialisée avec succès")
+        
+    except Exception as e:
+        print(f"❌ Erreur initialisation PostgreSQL : {e}")
+        raise
 
-
-init_database()
-
-import base64
-import requests
-import secrets
-import json
-import re
-from flask import Flask, request, render_template, redirect, url_for, session, flash, jsonify
+if __name__ == "__main__":
+    init_database()
