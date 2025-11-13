@@ -1,17 +1,12 @@
-import sqlite3
 import os
+import sqlite3
 
+# AJOUTEZ CECI TOUT EN HAUT, AVANT TOUT LE RESTE
 def init_database():
     """Initialise la base de données avec la table users"""
     db_path = "users.db"
-    
-    # Crée le répertoire si nécessaire
-    os.makedirs(os.path.dirname(db_path) if os.path.dirname(db_path) else ".", exist_ok=True)
-    
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
-    
-    # Création de la table users
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -22,10 +17,16 @@ def init_database():
             password TEXT NOT NULL
         )
     ''')
-    
     conn.commit()
     conn.close()
     print(f"✓ Base de données initialisée : {db_path}")
 
-if __name__ == "__main__":
-    init_database()
+
+init_database()
+
+import base64
+import requests
+import secrets
+import json
+import re
+from flask import Flask, request, render_template, redirect, url_for, session, flash, jsonify
