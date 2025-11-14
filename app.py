@@ -1,13 +1,12 @@
 import os
-import base64
 import requests
 import secrets
 import json
 import re
+import traceback
 from flask import Flask, request, render_template, redirect, url_for, session, flash, jsonify
 from flask_bcrypt import Bcrypt
 from flask_mail import Mail, Message
-from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 import pymysql
 
@@ -17,42 +16,36 @@ load_dotenv()
 # Configuration base de données
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
-# Initialiser la base de données au démarrage
+# Initialiser la base de données au démarrage (init_db doit exister)
 if DATABASE_URL:
-    # Mode production avec PostgreSQL
     import psycopg2
     from init_db import init_database
     init_database()
-    
+
     def get_db_connection():
-        """Connexion PostgreSQL"""
         return psycopg2.connect(DATABASE_URL)
 else:
-    # Mode développement avec SQLite
     import sqlite3
     from init_db import init_database
     init_database()
-    
+
     def get_db_connection():
-        """Connexion SQLite (développement local)"""
         return sqlite3.connect("users.db")
 
 app = Flask(__name__)
 app.config['DEBUG'] = True
 bcrypt = Bcrypt(app)
-app.secret_key = secrets.token_hex(16)
+# Si tu veux utiliser un secret déterministe en prod, mets FLASK_SECRET_KEY dans les envs
+app.secret_key = os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(16)
 
 CLIENT_ID = os.getenv("CLIENT_ID", "").strip()
 CLIENT_SECRET = os.getenv("CLIENT_SECRET", "").strip()
 TOKEN_URL = "https://portail-api.insee.fr/token"
-API_BASE = "https://api.insee.fr/api-sirene/3.11"
 API_SIRENE_SIRET_URL = "https://api.insee.fr/api-sirene/3.11/siret/{siret}"
-BODACC_API_URL = "https://bodacc-datadila.opendatasoft.com/api/records/1.0/search/?dataset=annonces-commerciales&q="
 
 INSEE_API_KEY = os.getenv("INSEE_API_KEY", "").strip()
 
 def insee_headers():
-    """Entêtes à utiliser pour appeler l'API Sirene avec la clé d'intégration."""
     return {
         "X-INSEE-Api-Key-Integration": INSEE_API_KEY,
         "Accept": "application/json",
@@ -68,22 +61,14 @@ mail = Mail(app)
 
 
 def get_insee_token() -> str | None:
-    """
-    Récupère un access_token OAuth2 (client_credentials) côté INSEE.
-    Retourne la chaîne du token, ou None en cas d'erreur.
-    """
     if not CLIENT_ID or not CLIENT_SECRET:
         print("INSEE OAuth: CLIENT_ID/CLIENT_SECRET manquants")
         return None
-
     try:
         resp = requests.post(
             TOKEN_URL,
             data={"grant_type": "client_credentials"},
-            headers={
-                "Content-Type": "application/x-www-form-urlencoded",
-                "Accept": "application/json",
-            },
+            headers={"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"},
             auth=(CLIENT_ID, CLIENT_SECRET),
             timeout=15,
         )
@@ -98,15 +83,10 @@ def get_insee_token() -> str | None:
     try:
         payload = resp.json()
     except ValueError:
-        print(f"INSEE OAuth: réponse non-JSON ({resp.status_code})\n{resp.text[:200]}")
+        print("INSEE OAuth: réponse non-JSON")
         return None
 
-    token = payload.get("access_token")
-    if not token:
-        print(f"INSEE OAuth: pas d'access_token dans la réponse: {payload}")
-        return None
-
-    return token
+    return payload.get("access_token")
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -114,19 +94,16 @@ def login():
     if request.method == "POST":
         email = request.form.get("email")
         password = request.form.get("password")
-        
+
         conn = get_db_connection()
         cursor = conn.cursor()
-        
-        # Utilise %s pour PostgreSQL, ? pour SQLite (géré automatiquement)
         if DATABASE_URL:
             cursor.execute("SELECT password FROM users WHERE email = %s", (email,))
         else:
             cursor.execute("SELECT password FROM users WHERE email = ?", (email,))
-            
         user = cursor.fetchone()
         conn.close()
-        
+
         if user and bcrypt.check_password_hash(user[0], password):
             session["user"] = email
             return redirect(url_for("search_company"))
@@ -158,33 +135,31 @@ def register():
         phone = request.form.get("phone")
         password = request.form.get("password")
         hashed_pw = bcrypt.generate_password_hash(password).decode("utf-8")
-        
+
         conn = get_db_connection()
         cursor = conn.cursor()
-        
+
         try:
             if DATABASE_URL:
-                # PostgreSQL
                 cursor.execute(
-                    "INSERT INTO users (name, lastname, email, phone, password) VALUES (%s, %s, %s, %s, %s)", 
+                    "INSERT INTO users (name, lastname, email, phone, password) VALUES (%s, %s, %s, %s, %s)",
                     (name, lastname, email, phone, hashed_pw)
                 )
             else:
-                # SQLite
                 cursor.execute(
-                    "INSERT INTO users (name, lastname, email, phone, password) VALUES (?, ?, ?, ?, ?)", 
+                    "INSERT INTO users (name, lastname, email, phone, password) VALUES (?, ?, ?, ?, ?)",
                     (name, lastname, email, phone, hashed_pw)
                 )
             conn.commit()
-        except Exception as e:
+        except Exception:
             conn.close()
             flash("Ce numéro ou email est déjà utilisé.", "error")
             return render_template("register.html")
-        
+
         conn.close()
         session["user"] = phone or email
         return redirect(url_for("search_company"))
-    
+
     return render_template("register.html")
 
 
@@ -192,67 +167,67 @@ def register():
 def forgot_password():
     if request.method == "POST":
         email = request.form.get("email")
-        
+
         conn = get_db_connection()
         cursor = conn.cursor()
-        
+
         if DATABASE_URL:
             cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
         else:
             cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
-            
+
         user = cursor.fetchone()
         conn.close()
-        
+
         if not user:
             return render_template("forgot_password.html", error="Email introuvable.")
-        
+
         token = secrets.token_urlsafe(32)
         session['reset_token'] = token
         session['reset_email'] = email
         reset_link = url_for("reset_password", token=token, _external=True)
-        
+
         msg = Message("Réinitialisation de votre mot de passe", recipients=[email])
         msg.body = f"Bonjour,\n\nVoici votre lien pour réinitialiser le mot de passe : {reset_link}\n\nCe lien est temporaire."
-        
+
         try:
             mail.send(msg)
             return render_template("forgot_password.html", message="Un lien a été envoyé à votre adresse email.")
         except Exception:
             return render_template("forgot_password.html", error="Erreur lors de l'envoi du mail.")
-    
+
     return render_template("forgot_password.html")
 
 
 @app.route("/reset-password", methods=["GET", "POST"])
 def reset_password():
     token = request.args.get("token") if request.method == "GET" else request.form.get("token")
-    
+
     if session.get('reset_token') != token:
         return render_template("reset_password.html", error="Token invalide ou expiré.", token=token)
-    
+
     if request.method == "POST":
         new_password = request.form.get("new_password")
         if new_password:
             hashed_pw = bcrypt.generate_password_hash(new_password).decode("utf-8")
             email = session.get('reset_email')
-            
+
             conn = get_db_connection()
             cursor = conn.cursor()
-            
+
             if DATABASE_URL:
                 cursor.execute("UPDATE users SET password = %s WHERE email = %s", (hashed_pw, email))
             else:
                 cursor.execute("UPDATE users SET password = ? WHERE email = ?", (hashed_pw, email))
-                
+
             conn.commit()
             conn.close()
-            
+
             session.pop('reset_token', None)
             session.pop('reset_email', None)
             flash("Mot de passe modifié avec succès.")
             return redirect(url_for("login"))
-    
+
     return render_template("reset_password.html", token=token)
 
 
@@ -261,9 +236,9 @@ def logout():
     session.pop("user", None)
     return redirect(url_for("login"))
 
+
 @app.route('/articles')
 def articles():
-    """Page statique des articles."""
     return render_template("articles.html")
 
 
@@ -294,8 +269,7 @@ def search_company():
             payload = resp.json()
             data = payload.get("etablissement") or payload.get("uniteLegale")
             if not data:
-                return render_template("search.html",
-                                       error="Réponse INSEE inattendue.")
+                return render_template("search.html", error="Réponse INSEE inattendue.")
             has_articles = 'articles' in app.view_functions
             return render_template("results.html", data=data, has_articles=has_articles)
 
@@ -316,7 +290,6 @@ def search_company():
 
 def generate_pdf_url(annonce):
     """Construit une URL PDF BODACC robuste sans lever d'erreur 500."""
-
     publicationavis = annonce.get("publicationavis") or "A"
     parution = annonce.get("parution") or ""
     numerodossier = str(annonce.get("numerodossier") or "0")
@@ -327,7 +300,6 @@ def generate_pdf_url(annonce):
     else:
         numero_annonce_str = str(numero_annonce).zfill(5)
 
-    # Année sécurisée
     annee = parution[:4] if len(parution) >= 4 else "0000"
 
     base_url = (
@@ -335,20 +307,17 @@ def generate_pdf_url(annonce):
         f"{publicationavis}/{annee}/{parution}/"
     )
 
-    # Première tentative : dossier réel
     url0 = (
         f"{base_url}{numerodossier}/"
         f"BODACC_{publicationavis}_PDF_Unitaire_{parution}_{numero_annonce_str}.pdf"
     )
 
-    # Vérifie si le PDF existe
     try:
         if requests.head(url0, timeout=10).status_code == 200:
             return url0
     except Exception:
         pass
 
-    # Deuxième tentative : fallback dossier 1
     try:
         url1 = (
             f"{base_url}1/"
@@ -359,93 +328,91 @@ def generate_pdf_url(annonce):
     except Exception:
         pass
 
-    # Dernier recours : retourner url0 même si pas trouvé
     return url0
 
 
 @app.route("/bodacc", methods=["GET"])
 def bodacc():
+    """
+    Endpoint flexible pour BODACC:
+    - accepte siret (14 chiffres) ou siren (9 chiffres) en querystring
+    - renvoie JSON: {"results": [...]} si accept JSON
+    - renvoie page HTML si besoin (par ex. render_template)
+    """
     print("➡️ Début /bodacc avec paramètres :", request.args)
+    # Auth check: si tu veux protéger la route côté backend
+    if "user" not in session:
+        if request.accept_mimetypes.accept_json:
+            return jsonify({"error": "Non authentifié"}), 401
+        return redirect(url_for("login"))
 
-    siren = request.args.get("siren")
-    departement = request.args.get("departement")
+    s = (request.args.get("siret") or request.args.get("siren") or "").strip()
+    if not s:
+        if request.accept_mimetypes.accept_json:
+            return jsonify({"error": "Paramètre 'siret' ou 'siren' manquant."}), 400
+        return render_template("bodacc.html", results=[], error="Paramètre manquant.")
 
-    if not siren:
-        return jsonify({"error": "Paramètre 'siren' requis"}), 400
+    # Normaliser siren
+    if s.isdigit() and len(s) == 14:
+        siren = s[:9]
+    elif s.isdigit() and len(s) == 9:
+        siren = s
+    else:
+        if request.accept_mimetypes.accept_json:
+            return jsonify({"error": "Numéro SIREN/SIRET invalide."}), 400
+        return render_template("bodacc.html", results=[], error="Numéro SIREN/SIRET invalide.")
 
-    # Construction URL
-    base_url = "https://bodacc-datadila.opendatasoft.com/api/records/1.0/search/"
+    # Appel OpenData BODACC (dataset annonces-commerciales)
+    url = f"https://bodacc-datadila.opendatasoft.com/api/records/1.0/search/"
     params = {
-        "dataset": "bodacc-b",
-        "rows": 100,
-        "sort": "dateparution",
-        "q": f"siren:{siren}"
+        "dataset": "annonces-commerciales",
+        "q": siren,
+        "rows": 50,
+        "sort": "dateparution"
     }
 
-    if departement:
-        params["refine.departement"] = departement
-
-    try:
-        r = requests.get(base_url, params=params)
-        r.raise_for_status()
-    except Exception as e:
-        print("❌ ERREUR API BODACC :", e)
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": "Erreur lors de l'appel à l'API BODACC"}), 500
-
-    data = r.json()
-    records = data.get("records", [])
     results = []
+    try:
+        r = requests.get(url, params=params, timeout=20)
+        r.raise_for_status()
+        payload = r.json()
+        records = payload.get("records", []) or []
+        for rec in records:
+            if not isinstance(rec, dict):
+                continue
+            f = rec.get("fields", {}) or {}
+            # description field may be under different keys; try several
+            description = f.get("description") or f.get("modificationsgenerales") or f.get("libelle") or ""
+            # If modificationsgenerales is a JSON string, try parse
+            if isinstance(description, str):
+                try:
+                    parsed = json.loads(description)
+                    if isinstance(parsed, dict):
+                        description = ", ".join(f"{k}: {v}" for k, v in parsed.items())
+                except Exception:
+                    pass
 
-    for rec in records:
-        if not isinstance(rec, dict):
-            print("❌ Record invalide :", rec)
-            continue
+            pdf_url = f.get("urlpdf") or generate_pdf_url(f)
 
-        f = rec.get("fields", {})
-        if not isinstance(f, dict):
-            print("❌ Champ 'fields' invalide :", f)
-            continue
+            results.append({
+                "date_parution": f.get("dateparution") or f.get("parution") or "",
+                "type_document": f.get("familleavis_lib") or f.get("familleavis") or f.get("typeavis_lib") or "",
+                "tribunal": f.get("tribunal") or f.get("source") or "",
+                "reference": f.get("numeroannonce") or f.get("reference") or "",
+                "description": description,
+                "pdf_url": pdf_url
+            })
+    except requests.RequestException as e:
+        print("❌ ERREUR API BODACC :", e)
+        traceback.print_exc()
+        if request.accept_mimetypes.accept_json:
+            return jsonify({"error": f"Erreur récupération annonces BODACC : {e}"}), 502
+        return render_template("bodacc.html", results=[], error=f"Erreur BODACC : {e}")
 
-        print("📌 TRAITEMENT FIELDS :", f)
-
-        # Sécurisation des champs optionnels
-        modifications = f.get("modificationsgenerales", {})
-        if not isinstance(modifications, dict):
-            modifications = {}
-
-        publicationavis = f.get("publicationavis", {})
-        if not isinstance(publicationavis, dict):
-            publicationavis = {}
-
-        parution = f.get("parution", {})
-        if not isinstance(parution, dict):
-            parution = {}
-
-        results.append({
-            "date": f.get("dateparution"),
-            "numerojo": f.get("numerojo"),
-            "numeroannonce": f.get("numeroannonce"),
-            "numerodossier": f.get("numerodossier"),
-            "tribunal": f.get("tribunal"),
-            "description": f.get("description"),
-            "parution": {
-                "organe": parution.get("organe"),
-                "numero": parution.get("numero"),
-                "date": parution.get("date")
-            },
-            "publicationavis": {
-                "numerojo": publicationavis.get("numerojo"),
-                "numparution": publicationavis.get("numparution"),
-                "dateparution": publicationavis.get("dateparution")
-            },
-            "modifications": modifications
-        })
-
-    print("➡️ Résultat final :", results)
-    return jsonify(results)
-
+    # Retour JSON si demandé (frontend JS attend {'results': [...]})
+    if request.accept_mimetypes.accept_json:
+        return jsonify({"results": results})
+    return render_template("bodacc.html", results=results)
 
 
 @app.route('/prospection', methods=['GET'])
@@ -455,22 +422,16 @@ def prospection():
         if not token:
             flash("Impossible d'obtenir un token INSEE (OAuth).", "error")
             return redirect(url_for("bodacc"))
-
         url = "https://api.insee.fr/entreprises/sirene/V3/siren"
-
         codes_naf = ["6201Z", "6202A", "6202B"]
         naf_query = " OR ".join([f"activitePrincipaleUniteLegale:{code}" for code in codes_naf])
         query = f"periode({naf_query})"
-
         params = {"q": query, "nombre": 100}
         headers = {"Authorization": f"Bearer {token}"}
-
         resp = requests.get(url, headers=headers, params=params, timeout=20)
         resp.raise_for_status()
         data = resp.json()
-
         entreprises = data.get("unitesLegales") or data.get("etablissements") or []
-
         results = []
         for ent in entreprises:
             results.append({
@@ -479,9 +440,7 @@ def prospection():
                 "date_creation": ent.get("dateCreationUniteLegale"),
                 "naf": ent.get("activitePrincipaleUniteLegale"),
             })
-
         return render_template("prospection.html", entreprises=results)
-
     except requests.RequestException as e:
         flash(f"Erreur API SIRENE : {e}", "error")
         return redirect(url_for("bodacc"))
