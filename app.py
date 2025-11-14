@@ -392,13 +392,26 @@ def bodacc():
         
         for rec in records:
             f = rec.get("fields", {})
+            
+            # Traiter la description
+            desc = f.get("modificationsgenerales", "")
+            if desc:
+                try:
+                    j = json.loads(desc)
+                    if isinstance(j, dict):
+                        desc = " | ".join(f"{k}: {v}" for k, v in j.items())
+                except:
+                    pass
+            else:
+                desc = "N/A"
+            
             results.append({
                 "date_parution": f.get("dateparution", ""),
                 "type_document": f.get("familleavis_lib", ""),
                 "tribunal": f.get("tribunal", ""),
                 "type_avis": f.get("typeavis_lib") or f.get("typeavis", ""),
                 "reference": f.get("numeroannonce", ""),
-                "description": str(f.get("modificationsgenerales", "")),
+                "description": desc,
                 "pdf_url": f.get("urlpdf", ""),
             })
         
