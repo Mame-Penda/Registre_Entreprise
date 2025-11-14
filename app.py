@@ -365,57 +365,87 @@ def generate_pdf_url(annonce):
 
 @app.route("/bodacc", methods=["GET"])
 def bodacc():
-    if "user" not in session:
-        if request.accept_mimetypes.accept_json:
-            return jsonify({"error": "Non authentifié"}), 401
-        return redirect(url_for("login"))
+    print("➡️ Début /bodacc avec paramètres :", request.args)
 
-    s = (request.args.get("siret") or request.args.get("siren") or "").strip()
-    if not s:
-        if request.accept_mimetypes.accept_json:
-            return jsonify({"error": "Paramètre 'siret' ou 'siren' manquant."}), 400
-        return render_template("bodacc.html", results=[])
+    siren = request.args.get("siren")
+    departement = request.args.get("departement")
 
-    if s.isdigit() and len(s) == 14:
-        siren = s[:9]
-    elif s.isdigit() and len(s) == 9:
-        siren = s
-    else:
-        if request.accept_mimetypes.accept_json:
-            return jsonify({"error": "Numéro SIREN/SIRET invalide."}), 400
-        return render_template("bodacc.html", results=[], error="Numéro SIREN/SIRET invalide.")
+    if not siren:
+        return jsonify({"error": "Paramètre 'siren' requis"}), 400
 
-    url = f"https://bodacc-datadila.opendatasoft.com/api/records/1.0/search/?dataset=annonces-commerciales&q={siren}&rows=50&sort=dateparution"
-    results = []
+    # Construction URL
+    base_url = "https://bodacc-datadila.opendatasoft.com/api/records/1.0/search/"
+    params = {
+        "dataset": "bodacc-b",
+        "rows": 100,
+        "sort": "dateparution",
+        "q": f"siren:{siren}"
+    }
+
+    if departement:
+        params["refine.departement"] = departement
+
     try:
-        r = requests.get(url, timeout=20)
+        r = requests.get(base_url, params=params)
         r.raise_for_status()
-        for rec in r.json().get("records", []):
-            f = rec.get("fields", {})
-            desc = f.get("modificationsgenerales", "")
-            try:
-                j = json.loads(desc)
-                if isinstance(j, dict):
-                    desc = ", ".join(f"{k} : {v}" for k, v in j.items())
-            except Exception:
-                pass
-            results.append({
-                "date_parution": f.get("dateparution", ""),
-                "type_document": f.get("familleavis_lib", ""),
-                "tribunal": f.get("tribunal", ""),
-                "type_avis": f.get("typeavis_lib") or f.get("typeavis", ""),
-                "reference": f.get("numeroannonce", ""),
-                "description": desc or "",
-                "pdf_url": f.get("urlpdf") or generate_pdf_url(f),
-            })
-    except requests.RequestException as e:
-        if request.accept_mimetypes.accept_json:
-            return jsonify({"error": f"Erreur récupération annonces BODACC : {e}"}), 502
-        return render_template("bodacc.html", results=[], error=f"Erreur BODACC : {e}")
+    except Exception as e:
+        print("❌ ERREUR API BODACC :", e)
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": "Erreur lors de l'appel à l'API BODACC"}), 500
 
-    if request.accept_mimetypes.accept_json:
-        return jsonify({"results": results})
-    return render_template("bodacc.html", results=results)
+    data = r.json()
+    records = data.get("records", [])
+    results = []
+
+    for rec in records:
+        if not isinstance(rec, dict):
+            print("❌ Record invalide :", rec)
+            continue
+
+        f = rec.get("fields", {})
+        if not isinstance(f, dict):
+            print("❌ Champ 'fields' invalide :", f)
+            continue
+
+        print("📌 TRAITEMENT FIELDS :", f)
+
+        # Sécurisation des champs optionnels
+        modifications = f.get("modificationsgenerales", {})
+        if not isinstance(modifications, dict):
+            modifications = {}
+
+        publicationavis = f.get("publicationavis", {})
+        if not isinstance(publicationavis, dict):
+            publicationavis = {}
+
+        parution = f.get("parution", {})
+        if not isinstance(parution, dict):
+            parution = {}
+
+        results.append({
+            "date": f.get("dateparution"),
+            "numerojo": f.get("numerojo"),
+            "numeroannonce": f.get("numeroannonce"),
+            "numerodossier": f.get("numerodossier"),
+            "tribunal": f.get("tribunal"),
+            "description": f.get("description"),
+            "parution": {
+                "organe": parution.get("organe"),
+                "numero": parution.get("numero"),
+                "date": parution.get("date")
+            },
+            "publicationavis": {
+                "numerojo": publicationavis.get("numerojo"),
+                "numparution": publicationavis.get("numparution"),
+                "dateparution": publicationavis.get("dateparution")
+            },
+            "modifications": modifications
+        })
+
+    print("➡️ Résultat final :", results)
+    return jsonify(results)
+
 
 
 @app.route('/prospection', methods=['GET'])
