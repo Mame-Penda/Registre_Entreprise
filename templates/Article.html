@@ -1,130 +1,63 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <title>À propos de nous</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Articles - Registre Entreprise</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;600&display=swap" rel="stylesheet">
+  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
   <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      margin: 0;
-      background-color: #FFFFFF;
-      color: #1C1C1C;
-    }
-    header {
-      background-color: #0D2C54;
-      padding: 40px 20px;
-      text-align: center;
-      color: white;
-    }
-    header h1 {
-      margin: 0;
-      font-size: 2.5em;
-    }
-    .container {
-      max-width: 1000px;
-      margin: 60px auto;
-      padding: 0 20px;
-    }
-    .container p {
-      line-height: 1.8;
-      font-size: 1.1em;
-      margin-bottom: 30px;
-    }
-    .team {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 30px;
-      margin-top: 40px;
-    }
-    .member {
-      text-align: center;
-      border-radius: 12px;
-      padding: 20px;
-      transition: transform 0.3s, box-shadow 0.3s;
-    }
-    .member:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 8px 15px rgba(0,0,0,0.1);
-    }
-    .member img {
-      border-radius: 50%;
-      width: 120px;
-      height: 120px;
-      object-fit: cover;
-      margin-bottom: 15px;
-    }
-    .member h3 {
-      margin: 10px 0 5px;
-      color: #0D2C54;
-    }
-    .socials {
-      margin-top: 60px;
-      text-align: center;
-    }
-    .socials a {
-      display: inline-block;
-      margin: 0 10px;
-      color: #0D2C54;
-      font-size: 1.5em;
-      text-decoration: none;
-    }
-    @media screen and (max-width: 600px) {
-      header h1 {
-        font-size: 1.8em;
-      }
-      .member img {
-        width: 100px;
-        height: 100px;
-      }
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Poppins', sans-serif; background: #F1F5F9; color: #1E293B; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 40px 20px; }
+    header { background: #2A6F97; color: white; padding: 20px; text-align: center; }
+    h1 { margin-bottom: 30px; }
+    .article { background: white; border-radius: 12px; padding: 30px; margin-bottom: 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    .article h2 { color: #2A6F97; margin-bottom: 15px; }
+    .article p { line-height: 1.8; margin-bottom: 15px; }
+    .back-link { display: inline-block; margin-top: 20px; padding: 10px 20px; background: #2A6F97; color: white; text-decoration: none; border-radius: 6px; }
+    .back-link:hover { background: #1E5A7A; }
   </style>
 </head>
 <body>
-<header>
-  <h1>À propos de nous</h1>
-</header>
-<div class="container">
-  <p>
-  Ce site est le fruit d’un <strong>projet tutoré mené dans le cadre de notre formation à Holberton School</strong>, où nous nous spécialisons en développement web et web mobile. Accompagnés par des mentors et partenaires engagés comme le Crédit Agricole, nous avons relevé ce défi avec enthousiasme, exigence et passion.
-  </p>
-  <p>
-  Nous sommes une équipe de jeunes développeurs dynamiques, curieux et animés par l’envie d’apprendre et de construire des solutions utiles et accessibles. Ce projet est bien plus qu’un exercice : c’est une première pierre posée dans notre parcours professionnel, un espace de création où nos idées prennent vie.
-  </p>
-  <div class="team">
-    <div class="member">
-      <img src="static/myriam.jpeg" alt="Myriam">
-      <h3>Myriam</h3>
-      <p>Frontend/Backend</p>
+  <header>
+    <h1>📰 Articles & Actualités</h1>
+  </header>
+
+  <div class="container">
+    <div class="article">
+      <h2>Bienvenue sur notre page Articles</h2>
+      <p>
+        Découvrez les dernières actualités et informations importantes concernant 
+        le registre des entreprises françaises et les nouvelles réglementations.
+      </p>
     </div>
-    <div class="member">
-      <img src="static/elodie.jpeg" alt="Elodie">
-      <h3>Elodie</h3>
-      <p>Frontend/Backend</p>
+
+    <div class="article">
+      <h2>Les nouveautés de l'API Sirene 2025</h2>
+      <p>
+        L'INSEE a déployé de nouvelles fonctionnalités pour l'API Sirene permettant 
+        un accès plus rapide et plus complet aux données des entreprises. 
+        Ces améliorations incluent des temps de réponse optimisés et de nouveaux 
+        champs d'information disponibles.
+      </p>
+      <p><strong>Date de publication :</strong> Janvier 2025</p>
     </div>
-    <div class="member">
-      <img src="static/mame.jpeg" alt="Mame">
-      <h3>Mame</h3>
-      <p>Frontend/Backend</p>
+
+    <div class="article">
+      <h2>Comprendre les annonces BODACC</h2>
+      <p>
+        Le Bulletin officiel des annonces civiles et commerciales (BODACC) publie 
+        les actes enregistrés au registre du commerce et des sociétés. 
+        Notre plateforme vous permet d'accéder facilement à ces informations 
+        pour suivre l'évolution des entreprises.
+      </p>
+      <p><strong>Date de publication :</strong> Novembre 2024</p>
     </div>
-    <div class="member">
-      <img src="static/ahmed.jpeg" alt="Ahmed">
-      <h3>Ahmed</h3>
-      <p>Frontend/Backend</p>
-    </div>
-  </div>
-  <div class="socials">
-    <a href="https://github.com/ton-profil" target="_blank" aria-label="GitHub">
-      <i class="fab fa-github"></i>
-    </a>
-    <a href="https://twitter.com/ton-compte" target="_blank" aria-label="Twitter">
-      <i class="fab fa-twitter"></i>
-    </a>
-    <a href="https://www.linkedin.com/in/ton-profil" target="_blank" aria-label="LinkedIn">
-      <i class="fab fa-linkedin"></i>
+
+    <a href="{{ url_for('search_company') }}" class="back-link">
+      <i class="fas fa-arrow-left"></i> Retour à la recherche
     </a>
   </div>
-</div>
 </body>
 </html>

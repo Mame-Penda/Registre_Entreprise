@@ -2,89 +2,78 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Articles - Registre Entreprise</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>À propos - Registre Entreprise</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;600&display=swap" rel="stylesheet">
+  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
   <style>
-    body {
-      font-family: 'Poppins', sans-serif;
-      margin: 0;
-      padding: 2rem;
-      background-color: #F8FBFD;
-      color: #1F3E46;
-    }
-    h1 {
-      text-align: center;
-      margin-bottom: 2rem;
-      color: #2A6F97;
-    }
-    .accordion {
-      background-color: #FFFFFF;
-      color: #2A6F97;
-      cursor: pointer;
-      padding: 1rem;
-      width: 100%;
-      border: none;
-      text-align: left;
-      outline: none;
-      font-size: 1.1rem;
-      font-weight: bold;
-      border-radius: 8px;
-      margin-bottom: 10px;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.05);
-      transition: background-color 0.3s ease;
-    }
-    .accordion:hover {
-      background-color: #E1EFF6;
-    }
-    .panel {
-      padding: 0 1rem 1rem;
-      background-color: white;
-      display: none;
-      overflow: hidden;
-      border-radius: 0 0 8px 8px;
-      line-height: 1.6;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Poppins', sans-serif; background: #F1F5F9; color: #1E293B; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 40px 20px; }
+    header { background: #2A6F97; color: white; padding: 20px; text-align: center; }
+    h1 { margin-bottom: 30px; }
+    .content { background: white; border-radius: 12px; padding: 40px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    .content h2 { color: #2A6F97; margin-top: 30px; margin-bottom: 15px; }
+    .content p { line-height: 1.8; margin-bottom: 15px; }
+    .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 30px 0; }
+    .feature { background: #F8FAFC; padding: 20px; border-radius: 8px; border-left: 4px solid #2A6F97; }
+    .feature h3 { color: #2A6F97; margin-bottom: 10px; }
+    .back-link { display: inline-block; margin-top: 20px; padding: 10px 20px; background: #2A6F97; color: white; text-decoration: none; border-radius: 6px; }
+    .back-link:hover { background: #1E5A7A; }
   </style>
 </head>
 <body>
-  <h1>Articles informatifs</h1>
-  <button class="accordion"> Comprendre le SIRET, le SIREN et le code APE</button>
-  <div class="panel">
-    <p>Le <strong>SIRET</strong> est un identifiant unique pour chaque établissement. Le <strong>SIREN</strong> identifie l'entreprise principale. Le <strong>code APE</strong> (ou NAF) indique l’activité principale de l’entreprise selon la nomenclature INSEE.</p>
+  <header>
+    <h1>ℹ️ À propos de Registre Entreprise</h1>
+  </header>
+
+  <div class="container">
+    <div class="content">
+      <h2>Notre Mission</h2>
+      <p>
+        Registre Entreprise est une plateforme innovante qui facilite l'accès aux 
+        informations officielles des entreprises françaises. Notre objectif est de 
+        rendre les données du registre du commerce accessible à tous de manière 
+        simple et intuitive.
+      </p>
+
+      <h2>Nos Fonctionnalités</h2>
+      <div class="features">
+        <div class="feature">
+          <h3><i class="fas fa-search"></i> Recherche SIRET</h3>
+          <p>Accédez instantanément aux informations d'une entreprise via son numéro SIRET.</p>
+        </div>
+        <div class="feature">
+          <h3><i class="fas fa-chart-line"></i> Annonces BODACC</h3>
+          <p>Consultez les publications officielles et suivez l'actualité des entreprises.</p>
+        </div>
+        <div class="feature">
+          <h3><i class="fas fa-map-marker-alt"></i> Localisation</h3>
+          <p>Visualisez l'emplacement géographique des entreprises sur une carte interactive.</p>
+        </div>
+        <div class="feature">
+          <h3><i class="fas fa-shield-alt"></i> Sécurité</h3>
+          <p>Vos données sont protégées et votre connexion est sécurisée.</p>
+        </div>
+      </div>
+
+      <h2>Nos Sources de Données</h2>
+      <p>
+        Nous utilisons les APIs officielles de l'INSEE et du BODACC pour garantir 
+        l'exactitude et la fiabilité des informations affichées. Toutes les données 
+        proviennent de sources gouvernementales vérifiées.
+      </p>
+
+      <h2>Contact</h2>
+      <p>
+        Pour toute question ou suggestion, n'hésitez pas à nous contacter via 
+        les réseaux sociaux disponibles en bas de page.
+      </p>
+
+      <a href="{{ url_for('search_company') }}" class="back-link">
+        <i class="fas fa-arrow-left"></i> Retour à la recherche
+      </a>
+    </div>
   </div>
-  <button class="accordion"> Que signifie une publication au BODACC ?</button>
-  <div class="panel">
-    <p>Le <strong>BODACC</strong> (Bulletin Officiel des Annonces Civiles et Commerciales) publie les événements légaux d’une entreprise : création, cession, redressement, etc. C’est une source d’information publique.</p>
-  </div>
-  <button class="accordion"> Comment lire les statuts d’une entreprise française ?</button>
-  <div class="panel">
-    <p>Les statuts définissent les règles de fonctionnement d’une société : objet, capital, associés, répartition des pouvoirs. Ils sont obligatoires et doivent être publiés lors de la création d’une entreprise.</p>
-  </div>
-  <button class="accordion"> Quelles sont les obligations légales d’un dirigeant ?</button>
-  <div class="panel">
-    <p>Un dirigeant doit déclarer ses comptes, respecter les lois fiscales et sociales, tenir une comptabilité sincère, convoquer des assemblées, et protéger les intérêts des associés et de l’entreprise.</p>
-  </div>
-  <button class="accordion"> À quoi sert le Registre du Commerce et des Sociétés (RCS) ?</button>
-  <div class="panel">
-    <p>Le <strong>RCS</strong> centralise toutes les entreprises commerciales en France. Il permet d’identifier légalement une société et d’en consulter les informations juridiques et financières.</p>
-  </div>
-  <button class="accordion"> Comment créer une entreprise en France : étapes clés</button>
-  <div class="panel">
-    <p>Choisir un statut juridique, rédiger les statuts, immatriculer l’entreprise auprès du greffe, publier une annonce légale et obtenir un numéro SIRET/SIREN sont les étapes principales.</p>
-  </div>
-  <script>
-    const acc = document.querySelectorAll(".accordion");
-    acc.forEach(button => {
-      button.addEventListener("click", function () {
-        this.classList.toggle("active");
-        const panel = this.nextElementSibling;
-        if (panel.style.display === "block") {
-          panel.style.display = "none";
-        } else {
-          panel.style.display = "block";
-        }
-      });
-    });
-  </script>
 </body>
 </html>

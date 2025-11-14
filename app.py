@@ -246,6 +246,19 @@ def logout():
     session.pop("user", None)
     return redirect(url_for("login"))
 
+@app.route('/articles')
+def articles():
+    if "user" not in session:
+        return redirect(url_for("login"))
+    return render_template("articles.html")
+
+
+@app.route('/about')
+def about():
+    if "user" not in session:
+        return redirect(url_for("login"))
+    return render_template("about.html")
+
 
 @app.route('/articles')
 def articles():
