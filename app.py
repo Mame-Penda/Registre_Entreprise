@@ -9,6 +9,16 @@ from flask_bcrypt import Bcrypt
 from flask_mail import Mail, Message
 from dotenv import load_dotenv
 import pymysql
+import traceback
+import sys
+
+# Active les logs détaillés
+import logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
 
 pymysql.install_as_MySQLdb()
 load_dotenv()
@@ -333,93 +343,79 @@ def generate_pdf_url(annonce):
 
 @app.route("/bodacc", methods=["GET"])
 def bodacc():
-    if "user" not in session:
-        if request.accept_mimetypes.accept_json:
-            return jsonify({"error": "Non authentifié"}), 401
-        return redirect(url_for("login"))
-
-    s = (request.args.get("siret") or request.args.get("siren") or "").strip()
-    
-    # Log pour débug
-    print(f"➡️ Début /bodacc avec paramètres : {request.args}")
-    
-    if not s:
-        if request.accept_mimetypes.accept_json:
-            return jsonify({"error": "Paramètre 'siret' ou 'siren' manquant."}), 400
-        return render_template("bodacc.html", results=[])
-
-    # Validation et conversion SIRET → SIREN
-    if s.isdigit() and len(s) == 14:
-        siren = s[:9]
-    elif s.isdigit() and len(s) == 9:
-        siren = s
-    else:
-        error_msg = f"Numéro SIREN/SIRET invalide : {len(s)} chiffres (attendu 9 ou 14)"
-        print(f"❌ {error_msg}")
-        if request.accept_mimetypes.accept_json:
-            return jsonify({"error": error_msg}), 400
-        return render_template("bodacc.html", results=[], error=error_msg)
-
-    print(f"✅ SIREN extrait : {siren}")
-
-    url = f"https://bodacc-datadila.opendatasoft.com/api/records/1.0/search/?dataset=annonces-commerciales&q={siren}&rows=50&sort=dateparution"
-    results = []
-    
     try:
-        print(f"🌐 Appel API BODACC : {url}")
-        r = requests.get(url, timeout=20)
-        r.raise_for_status()
+        print("=" * 80)
+        print("🔍 DÉBUT BODACC")
+        print(f"Session user: {session.get('user')}")
+        print(f"Request args: {request.args}")
         
+        if "user" not in session:
+            print("❌ User not in session")
+            if request.accept_mimetypes.accept_json:
+                return jsonify({"error": "Non authentifié"}), 401
+            return redirect(url_for("login"))
+
+        s = (request.args.get("siret") or request.args.get("siren") or "").strip()
+        print(f"📝 Paramètre reçu: '{s}'")
+        
+        if not s:
+            print("❌ Paramètre vide")
+            if request.accept_mimetypes.accept_json:
+                return jsonify({"error": "Paramètre 'siret' ou 'siren' manquant."}), 400
+            return jsonify({"error": "Paramètre manquant"}), 400
+
+        # Validation
+        if s.isdigit() and len(s) == 14:
+            siren = s[:9]
+            print(f"✅ SIRET 14 chiffres → SIREN: {siren}")
+        elif s.isdigit() and len(s) == 9:
+            siren = s
+            print(f"✅ SIREN 9 chiffres: {siren}")
+        else:
+            error_msg = f"Numéro invalide: {len(s)} chiffres"
+            print(f"❌ {error_msg}")
+            return jsonify({"error": error_msg}), 400
+
+        url = f"https://bodacc-datadila.opendatasoft.com/api/records/1.0/search/?dataset=annonces-commerciales&q={siren}&rows=50"
+        print(f"🌐 URL API: {url}")
+        
+        results = []
+        
+        print("📡 Appel API BODACC...")
+        r = requests.get(url, timeout=20)
+        print(f"📊 Status Code: {r.status_code}")
+        
+        r.raise_for_status()
         data = r.json()
         records = data.get("records", [])
-        print(f"📊 Nombre de résultats : {len(records)}")
+        print(f"📦 Nombre de records: {len(records)}")
         
         for rec in records:
             f = rec.get("fields", {})
-            desc = f.get("modificationsgenerales", "")
-            try:
-                j = json.loads(desc)
-                if isinstance(j, dict):
-                    desc = ", ".join(f"{k} : {v}" for k, v in j.items())
-            except Exception:
-                pass
-            
             results.append({
                 "date_parution": f.get("dateparution", ""),
                 "type_document": f.get("familleavis_lib", ""),
                 "tribunal": f.get("tribunal", ""),
                 "type_avis": f.get("typeavis_lib") or f.get("typeavis", ""),
                 "reference": f.get("numeroannonce", ""),
-                "description": desc or "",
-                "pdf_url": f.get("urlpdf") or generate_pdf_url(f),
+                "description": str(f.get("modificationsgenerales", "")),
+                "pdf_url": f.get("urlpdf", ""),
             })
-            
-    except requests.Timeout:
-        error_msg = "Timeout lors de l'appel à l'API BODACC"
-        print(f"❌ {error_msg}")
-        if request.accept_mimetypes.accept_json:
-            return jsonify({"error": error_msg}), 504
-        return render_template("bodacc.html", results=[], error=error_msg)
         
-    except requests.RequestException as e:
-        error_msg = f"Erreur récupération annonces BODACC : {e}"
-        print(f"❌ {error_msg}")
-        if request.accept_mimetypes.accept_json:
-            return jsonify({"error": error_msg}), 502
-        return render_template("bodacc.html", results=[], error=error_msg)
+        print(f"✅ {len(results)} résultats construits")
+        print("=" * 80)
+        
+        return jsonify({"results": results})
         
     except Exception as e:
-        error_msg = f"Erreur inattendue : {e}"
-        print(f"❌ {error_msg}")
-        if request.accept_mimetypes.accept_json:
-            return jsonify({"error": error_msg}), 500
-        return render_template("bodacc.html", results=[], error=error_msg)
-
-    print(f"✅ Retour de {len(results)} résultats")
-    
-    if request.accept_mimetypes.accept_json:
-        return jsonify({"results": results})
-    return render_template("bodacc.html", results=results)
+        print("=" * 80)
+        print(f"❌❌❌ ERREUR CRITIQUE ❌❌❌")
+        print(f"Type: {type(e).__name__}")
+        print(f"Message: {str(e)}")
+        print("Traceback complet:")
+        traceback.print_exc()
+        print("=" * 80)
+        return jsonify({"error": f"Erreur serveur: {str(e)}"}), 500
 
 
 @app.route('/prospection', methods=['GET'])
