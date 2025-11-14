@@ -292,7 +292,7 @@ def search_company():
                 return render_template("search.html",
                                        error="Réponse INSEE inattendue.")
             has_articles = 'articles' in app.view_functions
-            return render_template("results.html", data=data, has_articles=has_articles)
+            return render_template("results.html", data=data, has_articles=False, has_about=False)
 
         elif resp.status_code == 404:
             return render_template("search.html", error="Établissement non trouvé.")
