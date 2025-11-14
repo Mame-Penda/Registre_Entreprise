@@ -261,7 +261,7 @@ def logout():
     session.pop("user", None)
     return redirect(url_for("login"))
 
-@app.routes('/articles')
+@app.route('/articles')
 def articles():
     """Page statique des articles."""
     return render_template("articles.html")
