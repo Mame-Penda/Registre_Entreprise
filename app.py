@@ -260,10 +260,6 @@ def about():
     return render_template("about.html")
 
 
-@app.route('/articles')
-def articles():
-    return render_template("articles.html")
-
 
 @app.route("/", methods=["GET", "POST"])
 def search_company():
