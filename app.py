@@ -315,23 +315,51 @@ def search_company():
 
 
 def generate_pdf_url(annonce):
-    publicationavis = annonce.get("publicationavis", "A")
-    parution = annonce.get("parution", "")
-    numerodossier = str(annonce.get("numerodossier", "0") or "0")
-    numero_annonce_str = str(annonce.get("numeroannonce", "")).zfill(5) if str(annonce.get("numeroannonce","")).isdigit() else "00000"
+    """Construit une URL PDF BODACC robuste sans lever d'erreur 500."""
+
+    publicationavis = annonce.get("publicationavis") or "A"
+    parution = annonce.get("parution") or ""
+    numerodossier = str(annonce.get("numerodossier") or "0")
+
+    numero_annonce = annonce.get("numeroannonce")
+    if numero_annonce is None or not str(numero_annonce).isdigit():
+        numero_annonce_str = "00000"
+    else:
+        numero_annonce_str = str(numero_annonce).zfill(5)
+
+    # Année sécurisée
     annee = parution[:4] if len(parution) >= 4 else "0000"
 
-    base_url = f"https://www.bodacc.fr/telechargements/COMMERCIALES/PDF/{publicationavis}/{annee}/{parution}/"
-    url0 = f"{base_url}{numerodossier}/BODACC_{publicationavis}_PDF_Unitaire_{parution}_{numero_annonce_str}.pdf"
+    base_url = (
+        f"https://www.bodacc.fr/telechargements/COMMERCIALES/PDF/"
+        f"{publicationavis}/{annee}/{parution}/"
+    )
+
+    # Première tentative : dossier réel
+    url0 = (
+        f"{base_url}{numerodossier}/"
+        f"BODACC_{publicationavis}_PDF_Unitaire_{parution}_{numero_annonce_str}.pdf"
+    )
+
+    # Vérifie si le PDF existe
     try:
         if requests.head(url0, timeout=10).status_code == 200:
             return url0
-        if numerodossier == "0":
-            url1 = f"{base_url}1/BODACC_{publicationavis}_PDF_Unitaire_{parution}_{numero_annonce_str}.pdf"
-            if requests.head(url1, timeout=10).status_code == 200:
-                return url1
-    except requests.RequestException:
+    except Exception:
         pass
+
+    # Deuxième tentative : fallback dossier 1
+    try:
+        url1 = (
+            f"{base_url}1/"
+            f"BODACC_{publicationavis}_PDF_Unitaire_{parution}_{numero_annonce_str}.pdf"
+        )
+        if requests.head(url1, timeout=10).status_code == 200:
+            return url1
+    except Exception:
+        pass
+
+    # Dernier recours : retourner url0 même si pas trouvé
     return url0
 
 
