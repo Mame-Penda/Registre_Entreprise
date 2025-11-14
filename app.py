@@ -261,6 +261,11 @@ def logout():
     session.pop("user", None)
     return redirect(url_for("login"))
 
+@app.routes('/articles')
+def articles():
+    """Page statique des articles."""
+    return render_template("articles.html")
+
 
 @app.route("/", methods=["GET", "POST"])
 def search_company():
