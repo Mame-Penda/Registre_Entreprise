@@ -333,83 +333,90 @@ def generate_pdf_url(annonce):
 
 @app.route("/bodacc", methods=["GET"])
 def bodacc():
-    """
-    Endpoint flexible pour BODACC:
-    - accepte siret (14 chiffres) ou siren (9 chiffres) en querystring
-    - renvoie JSON: {"results": [...]} si accept JSON
-    - renvoie page HTML si besoin (par ex. render_template)
-    """
-    print("➡️ Début /bodacc avec paramètres :", request.args)
-    # Auth check: si tu veux protéger la route côté backend
     if "user" not in session:
         if request.accept_mimetypes.accept_json:
             return jsonify({"error": "Non authentifié"}), 401
         return redirect(url_for("login"))
 
     s = (request.args.get("siret") or request.args.get("siren") or "").strip()
+    
+    # Log pour débug
+    print(f"➡️ Début /bodacc avec paramètres : {request.args}")
+    
     if not s:
         if request.accept_mimetypes.accept_json:
             return jsonify({"error": "Paramètre 'siret' ou 'siren' manquant."}), 400
-        return render_template("bodacc.html", results=[], error="Paramètre manquant.")
+        return render_template("bodacc.html", results=[])
 
-    # Normaliser siren
+    # Validation et conversion SIRET → SIREN
     if s.isdigit() and len(s) == 14:
         siren = s[:9]
     elif s.isdigit() and len(s) == 9:
         siren = s
     else:
+        error_msg = f"Numéro SIREN/SIRET invalide : {len(s)} chiffres (attendu 9 ou 14)"
+        print(f"❌ {error_msg}")
         if request.accept_mimetypes.accept_json:
-            return jsonify({"error": "Numéro SIREN/SIRET invalide."}), 400
-        return render_template("bodacc.html", results=[], error="Numéro SIREN/SIRET invalide.")
+            return jsonify({"error": error_msg}), 400
+        return render_template("bodacc.html", results=[], error=error_msg)
 
-    # Appel OpenData BODACC (dataset annonces-commerciales)
-    url = f"https://bodacc-datadila.opendatasoft.com/api/records/1.0/search/"
-    params = {
-        "dataset": "annonces-commerciales",
-        "q": siren,
-        "rows": 50,
-        "sort": "dateparution"
-    }
+    print(f"✅ SIREN extrait : {siren}")
 
+    url = f"https://bodacc-datadila.opendatasoft.com/api/records/1.0/search/?dataset=annonces-commerciales&q={siren}&rows=50&sort=dateparution"
     results = []
+    
     try:
-        r = requests.get(url, params=params, timeout=20)
+        print(f"🌐 Appel API BODACC : {url}")
+        r = requests.get(url, timeout=20)
         r.raise_for_status()
-        payload = r.json()
-        records = payload.get("records", []) or []
+        
+        data = r.json()
+        records = data.get("records", [])
+        print(f"📊 Nombre de résultats : {len(records)}")
+        
         for rec in records:
-            if not isinstance(rec, dict):
-                continue
-            f = rec.get("fields", {}) or {}
-            # description field may be under different keys; try several
-            description = f.get("description") or f.get("modificationsgenerales") or f.get("libelle") or ""
-            # If modificationsgenerales is a JSON string, try parse
-            if isinstance(description, str):
-                try:
-                    parsed = json.loads(description)
-                    if isinstance(parsed, dict):
-                        description = ", ".join(f"{k}: {v}" for k, v in parsed.items())
-                except Exception:
-                    pass
-
-            pdf_url = f.get("urlpdf") or generate_pdf_url(f)
-
+            f = rec.get("fields", {})
+            desc = f.get("modificationsgenerales", "")
+            try:
+                j = json.loads(desc)
+                if isinstance(j, dict):
+                    desc = ", ".join(f"{k} : {v}" for k, v in j.items())
+            except Exception:
+                pass
+            
             results.append({
-                "date_parution": f.get("dateparution") or f.get("parution") or "",
-                "type_document": f.get("familleavis_lib") or f.get("familleavis") or f.get("typeavis_lib") or "",
-                "tribunal": f.get("tribunal") or f.get("source") or "",
-                "reference": f.get("numeroannonce") or f.get("reference") or "",
-                "description": description,
-                "pdf_url": pdf_url
+                "date_parution": f.get("dateparution", ""),
+                "type_document": f.get("familleavis_lib", ""),
+                "tribunal": f.get("tribunal", ""),
+                "type_avis": f.get("typeavis_lib") or f.get("typeavis", ""),
+                "reference": f.get("numeroannonce", ""),
+                "description": desc or "",
+                "pdf_url": f.get("urlpdf") or generate_pdf_url(f),
             })
-    except requests.RequestException as e:
-        print("❌ ERREUR API BODACC :", e)
-        traceback.print_exc()
+            
+    except requests.Timeout:
+        error_msg = "Timeout lors de l'appel à l'API BODACC"
+        print(f"❌ {error_msg}")
         if request.accept_mimetypes.accept_json:
-            return jsonify({"error": f"Erreur récupération annonces BODACC : {e}"}), 502
-        return render_template("bodacc.html", results=[], error=f"Erreur BODACC : {e}")
+            return jsonify({"error": error_msg}), 504
+        return render_template("bodacc.html", results=[], error=error_msg)
+        
+    except requests.RequestException as e:
+        error_msg = f"Erreur récupération annonces BODACC : {e}"
+        print(f"❌ {error_msg}")
+        if request.accept_mimetypes.accept_json:
+            return jsonify({"error": error_msg}), 502
+        return render_template("bodacc.html", results=[], error=error_msg)
+        
+    except Exception as e:
+        error_msg = f"Erreur inattendue : {e}"
+        print(f"❌ {error_msg}")
+        if request.accept_mimetypes.accept_json:
+            return jsonify({"error": error_msg}), 500
+        return render_template("bodacc.html", results=[], error=error_msg)
 
-    # Retour JSON si demandé (frontend JS attend {'results': [...]})
+    print(f"✅ Retour de {len(results)} résultats")
+    
     if request.accept_mimetypes.accept_json:
         return jsonify({"results": results})
     return render_template("bodacc.html", results=results)
