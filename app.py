@@ -390,28 +390,28 @@ def bodacc():
         # Validation
         if s.isdigit() and len(s) == 14:
             siren = s[:9]
-            print(f"✅ SIRET 14 chiffres → SIREN: {siren}")
+            print(f" SIRET 14 chiffres → SIREN: {siren}")
         elif s.isdigit() and len(s) == 9:
             siren = s
-            print(f"✅ SIREN 9 chiffres: {siren}")
+            print(f" SIREN 9 chiffres: {siren}")
         else:
             error_msg = f"Numéro invalide: {len(s)} chiffres"
-            print(f"❌ {error_msg}")
+            print(f" {error_msg}")
             return jsonify({"error": error_msg}), 400
 
         url = f"https://bodacc-datadila.opendatasoft.com/api/records/1.0/search/?dataset=annonces-commerciales&q={siren}&rows=50"
-        print(f"🌐 URL API: {url}")
+        print(f" URL API: {url}")
         
         results = []
         
-        print("📡 Appel API BODACC...")
+        print(" Appel API BODACC...")
         r = requests.get(url, timeout=20)
-        print(f"📊 Status Code: {r.status_code}")
+        print(f" Status Code: {r.status_code}")
         
         r.raise_for_status()
         data = r.json()
         records = data.get("records", [])
-        print(f"📦 Nombre de records: {len(records)}")
+        print(f" Nombre de records: {len(records)}")
         
         for rec in records:
             f = rec.get("fields", {})
@@ -438,7 +438,7 @@ def bodacc():
                 "pdf_url": f.get("urlpdf", ""),
             })
         
-        print(f"✅ {len(results)} résultats construits")
+        print(f" {len(results)} résultats construits")
         print("=" * 80)
         
         return jsonify({"results": results})
@@ -453,8 +453,8 @@ def bodacc():
         print("=" * 80)
         return jsonify({"error": f"Erreur serveur: {str(e)}"}), 500
     
-@app.route('/dashboard')
-def dashboard():
+@app.route('/dashboard/data')
+def dashboard_data():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     con = get_db_connection()
