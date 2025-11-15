@@ -1,60 +1,91 @@
-
-Mame Penda Sadio <mamependasadio1@gmail.com>
-02:18 (il y a 0 minute)
-À moi
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<title>Mes Favoris - Registre Entreprise</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mes Favoris</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;600&display=swap" rel="stylesheet">
+  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Poppins', sans-serif; background: #F1F5F9; display: flex; min-height: 100vh; }
+    aside { width: 240px; background: #0F172A; color: white; padding: 20px; }
+    aside h2 { font-size: 20px; margin-bottom: 30px; }
+    aside nav a { display: flex; align-items: center; padding: 12px 16px; color: white; text-decoration: none; margin-bottom: 10px; border-radius: 6px; transition: background 0.3s; }
+    aside nav a:hover, aside nav a.active { background: #2A6F97; }
+    aside nav a i { margin-right: 12px; }
+    .main-content { flex: 1; display: flex; flex-direction: column; }
+    header { background: #2A6F97; color: white; padding: 16px 24px; }
+    .content { padding: 32px; flex: 1; }
+    .card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    .card h3 { color: #2A6F97; margin-bottom: 20px; }
+    .favori-item { display: flex; justify-content: space-between; align-items: center; padding: 15px; background: #F8FAFC; border-radius: 8px; margin-bottom: 10px; }
+    .favori-info h4 { color: #0F172A; margin-bottom: 5px; }
+    .favori-info p { color: #64748B; font-size: 14px; }
+    .btn-supprimer { background: #EF4444; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+    .btn-supprimer:hover { background: #DC2626; }
+    .empty-state { text-align: center; padding: 60px 20px; color: #64748B; }
+    .empty-state i { font-size: 64px; margin-bottom: 20px; opacity: 0.5; }
+  </style>
 </head>
 <body>
-<header>
-<nav>
-<a href="/"> Accueil</a>
-<a href="/search"> Recherche</a>
-<a href="/favoris"> Mes Favoris</a>
-<a href="/dashboard"> Dashboard</a>
-</nav>
-</header>
+  <aside>
+    <h2><i class="fas fa-user-circle"></i> Registre Entreprise</h2>
+    <nav>
+      <a href="{{ url_for('search_company') }}"><i class="fas fa-search"></i> Recherche</a>
+      <a href="{{ url_for('mes_favoris') }}" class="active"><i class="fas fa-star"></i> Mes Favoris</a>
+      <a href="{{ url_for('articles') }}"><i class="fas fa-newspaper"></i> Articles</a>
+      <a href="{{ url_for('about') }}"><i class="fas fa-info-circle"></i> À propos</a>
+      <a href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> Se déconnecter</a>
+    </nav>
+  </aside>
 
-<main>
-<h1> Mes Entreprises Favorites</h1>
-{% if favoris %}
-<div class="favoris-grid">
-{% for fav in favoris %}
-<div class="favori-card">
-<h3>{{ fav.nom_entreprise }}</h3>
-<p>SIREN: {{ fav.siren }}</p>
-<p>Ajouté le: {{ fav.date_ajout.strftime('%d/%m/%Y') }}</p>
-<a href="/entreprise/{{ fav.siren }}" class="btn">Voir détails</a>
-<button onclick="retirerFavori('{{ fav.siren }}')" class="btn-danger">
- Retirer
-</button>
-</div>
-{% endfor %}
-</div>
-{% else %}
-<p>Vous n'avez pas encore de favoris.</p>
-{% endif %}
-</main>
+  <div class="main-content">
+    <header><h1>⭐ Mes Favoris</h1></header>
 
-<script>
-function retirerFavori(siren) {
-if (confirm('Retirer cette entreprise de vos favoris ?')) {
-fetch(`/favoris/remove/${siren}`, {
-method: 'POST'
-})
-.then(response => response.json())
-.then(data => {
-if (data.success) {
-location.reload();
-}
-});
-}
-}
-</script>
+    <div class="content">
+      <div class="card">
+        <h3>Entreprises favorites ({{ favoris|length }})</h3>
+        
+        {% if favoris %}
+          {% for fav in favoris %}
+          <div class="favori-item" id="fav-{{ fav[0] }}">
+            <div class="favori-info">
+              <h4>{{ fav[1] or 'Entreprise' }}</h4>
+              <p>SIRET: {{ fav[0] }} • Ajouté le {{ fav[2][:10] if fav[2] else 'N/A' }}</p>
+            </div>
+            <button class="btn-supprimer" onclick="supprimerFavori('{{ fav[0] }}')">
+              <i class="fas fa-trash"></i> Supprimer
+            </button>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="empty-state">
+            <i class="fas fa-star"></i>
+            <p>Vous n'avez pas encore de favoris.</p>
+            <p>Ajoutez des entreprises depuis la page de recherche !</p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function supprimerFavori(siret) {
+      if (!confirm('Supprimer cette entreprise des favoris ?')) return;
+      
+      try {
+        const res = await fetch(`/supprimer_favori/${siret}`, { method: 'DELETE' });
+        if (res.ok) {
+          document.getElementById(`fav-${siret}`).remove();
+          location.reload();
+        } else {
+          alert('Erreur lors de la suppression');
+        }
+      } catch (err) {
+        alert('Erreur réseau');
+      }
+    }
+  </script>
 </body>
 </html>

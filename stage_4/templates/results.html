@@ -13,19 +13,22 @@
     aside h2 { font-size: 20px; margin-bottom: 30px; }
     aside nav a { display: flex; align-items: center; padding: 12px 16px; color: white; text-decoration: none; margin-bottom: 10px; border-radius: 6px; transition: background 0.3s; }
     aside nav a:hover { background-color: #1E293B; }
+    aside nav a.active { background:#2A6F97; color:#F1F5F9; font-weight:700; }
     aside nav a i { margin-right: 12px; }
     .main-content { flex: 1; display: flex; flex-direction: column; }
-    header { background: #2A6F97; color: white; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+    header { background: #2A6F97; color: white; padding: 16px 24px; }
     .content { padding: 32px; flex: 1; overflow-y: auto; }
     .card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 8px 16px rgba(0,0,0,0.06); margin-bottom: 24px; }
     .card h3 { margin-bottom: 12px; font-size: 20px; color: #0F172A; }
     .card p { margin-bottom: 8px; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .btn-favori { background: #2A6F97; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; transition: background 0.3s; }
+    .btn-favori:hover { background: #1E5A7A; }
     .dirigeants ul { padding-left: 20px; }
     .dirigeants li { margin-bottom: 10px; }
-    iframe { margin-top: 12px; width: 100%; height: 300px; border: 2px solid #2A6F97; border-radius: 12px; box-shadow: 0 0 16px rgba(42,111,151,.4); }
+    iframe { margin-top: 12px; width: 100%; height: 300px; border: 2px solid #2A6F97; border-radius: 12px; }
     footer { background: #0F172A; color: white; text-align: center; padding: 16px; }
     .error { color: #b91c1c; font-weight: 600; }
-    aside nav a.active { background:#2A6F97; color:#F1F5F9; font-weight:700; box-shadow:0 0 10px #2A6F97AA; }
     @media (max-width: 768px){ aside{display:none;} }
   </style>
 </head>
@@ -34,29 +37,29 @@
     <h2><i class="fas fa-user-circle"></i> Registre Entreprise</h2>
     <nav>
       <a href="{{ url_for('search_company') }}"><i class="fas fa-search"></i> Recherche</a>
-      <a href="#" id="bodacc-link"><i class="fas fa-chart-line"></i> Annonces et Publications</a>
-
-      {# On n’affiche ces liens que s’ils existent réellement #}
-      {% if has_articles %}
-        <a href="{{ url_for('articles') }}"><i class="fas fa-newspaper"></i> About us</a>
-      {% endif %}
-      {% if has_about %}
-        <a href="{{ url_for('about') }}"><i class="fas fa-sticky-note"></i> Article</a>
-      {% endif %}
-
+      <a href="#" id="bodacc-link"><i class="fas fa-chart-line"></i> Annonces BODACC</a>
+      <a href="{{ url_for('mes_favoris') }}"><i class="fas fa-star"></i> Mes Favoris</a>
+      <a href="{{ url_for('articles') }}"><i class="fas fa-newspaper"></i> Articles</a>
+      <a href="{{ url_for('about') }}"><i class="fas fa-info-circle"></i> À propos</a>
       <a href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> Se déconnecter</a>
     </nav>
   </aside>
 
   <div class="main-content">
-    <header><span>Bienvenue</span></header>
+    <header><h1>Informations Entreprise</h1></header>
 
     <div class="content">
       {% if error %}
         <div class="card"><p class="error">{{ error }}</p></div>
       {% elif data %}
         <div class="card" id="entreprise-card">
-          <h3>{{ data.uniteLegale.denominationUniteLegale or 'Entreprise inconnue' }}</h3>
+          <div class="card-header">
+            <h3>{{ data.uniteLegale.denominationUniteLegale or 'Entreprise inconnue' }}</h3>
+            <button class="btn-favori" onclick="ajouterFavori()">
+              <i class="fas fa-star"></i> Ajouter aux favoris
+            </button>
+          </div>
+          
           <p><strong>SIRET :</strong> {{ data.siret }}</p>
           <p><strong>Adresse :</strong>
             {% set adresse =
@@ -101,17 +104,34 @@
 
     <footer>
       &copy; 2025 Registre Entreprise. Tous droits réservés.
-      <p>Suivez-nous</p>
-      <div class="social-links">
-        <a href="https://github.com" target="_blank"><i class="fab fa-github"></i></a>
-        <a href="https://linkedin.com" target="_blank"><i class="fab fa-linkedin"></i></a>
-        <a href="https://whatsapp.com" target="_blank"><i class="fab fa-whatsapp"></i></a>
-        <a href="https://x.com" target="_blank"><i class="fab fa-x-twitter"></i></a>
-      </div>
     </footer>
   </div>
 
   <script>
+    // Fonction pour ajouter aux favoris
+    async function ajouterFavori() {
+      try {
+        const res = await fetch('/ajouter_favori', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            siret: '{{ data.siret }}',
+            nom_entreprise: '{{ data.uniteLegale.denominationUniteLegale or "Entreprise" }}'
+          })
+        });
+        
+        const result = await res.json();
+        if (res.ok) {
+          alert('✅ Ajouté aux favoris !');
+        } else {
+          alert(result.error || 'Déjà dans les favoris');
+        }
+      } catch (err) {
+        alert('❌ Erreur réseau');
+      }
+    }
+
+    // Gestion BODACC
     document.addEventListener("DOMContentLoaded", () => {
       const navLinks = document.querySelectorAll("aside nav a");
       const bodaccLink = document.getElementById("bodacc-link");
@@ -121,11 +141,12 @@
       const siret = "{{ data.siret if data else '' }}";
 
       function clearActive(){ navLinks.forEach(l => l.classList.remove("active")); }
-      clearActive(); // par défaut, pas d’actif forcé
 
       bodaccLink.addEventListener("click", async (e) => {
         e.preventDefault();
-        clearActive(); bodaccLink.classList.add("active");
+        clearActive(); 
+        bodaccLink.classList.add("active");
+        
         if (entrepriseCard) entrepriseCard.style.display = "none";
         if (dirigeantsCard) dirigeantsCard.style.display = "none";
 
@@ -145,22 +166,21 @@
             return;
           }
           if (!data.results || data.results.length === 0) {
-            contentDiv.innerHTML = `<div class='card'><p>Aucune annonce trouvée pour ce SIREN.</p></div>`;
+            contentDiv.innerHTML = `<div class='card'><p>Aucune annonce trouvée.</p></div>`;
             return;
           }
 
           let html = `
             <div class="card">
-              <h3>Annonces BODACC</h3>
-              <table style="width:100%; border-collapse: collapse; font-weight: 300; font-size: 0.95rem; color: #333;">
+              <h3>Annonces BODACC (${data.results.length})</h3>
+              <table style="width:100%; border-collapse: collapse; font-size: 0.95rem;">
                 <thead>
-                  <tr style="background-color: #e0f0fb; font-weight: 600; color: #2a6f97;">
-                    <th style="padding: 12px 10px; text-align:left; border-bottom: 1px solid #ddd;">Date de parution</th>
-                    <th style="padding: 12px 10px; text-align:left; border-bottom: 1px solid #ddd;">Type d'avis</th>
-                    <th style="padding: 12px 10px; text-align:left; border-bottom: 1px solid #ddd;">Tribunal</th>
-                    <th style="padding: 12px 10px; text-align:left; border-bottom: 1px solid #ddd;">Référence</th>
-                    <th style="padding: 12px 10px; text-align:left; border-bottom: 1px solid #ddd;">Description</th>
-                    <th style="padding: 12px 10px; border-bottom: 1px solid #ddd;">PDF</th>
+                  <tr style="background-color: #e0f0fb; color: #2a6f97;">
+                    <th style="padding: 12px; text-align:left; border-bottom: 1px solid #ddd;">Date</th>
+                    <th style="padding: 12px; text-align:left; border-bottom: 1px solid #ddd;">Type</th>
+                    <th style="padding: 12px; text-align:left; border-bottom: 1px solid #ddd;">Tribunal</th>
+                    <th style="padding: 12px; text-align:left; border-bottom: 1px solid #ddd;">Description</th>
+                    <th style="padding: 12px; border-bottom: 1px solid #ddd;">PDF</th>
                   </tr>
                 </thead>
                 <tbody>`;
@@ -168,13 +188,12 @@
           data.results.forEach(r => {
             html += `
               <tr>
-                <td style="padding: 12px 10px; border-bottom: 1px solid #ddd;">${r.date_parution || ''}</td>
-                <td style="padding: 12px 10px; border-bottom: 1px solid #ddd;">${r.type_avis || r.type_document || ''}</td>
-                <td style="padding: 12px 10px; border-bottom: 1px solid #ddd;">${r.tribunal || r.source || ''}</td>
-                <td style="padding: 12px 10px; border-bottom: 1px solid #ddd;">${r.reference || ''}</td>
-                <td style="padding: 12px 10px; border-bottom: 1px solid #ddd;">${r.description || ''}</td>
-                <td style="padding: 12px 10px; border-bottom: 1px solid #ddd;">
-                  ${r.pdf_url ? `<a href="${r.pdf_url}" target="_blank" rel="noopener noreferrer">Voir PDF</a>` : "N/A"}
+                <td style="padding: 12px; border-bottom: 1px solid #ddd;">${r.date_parution || ''}</td>
+                <td style="padding: 12px; border-bottom: 1px solid #ddd;">${r.type_avis || r.type_document || ''}</td>
+                <td style="padding: 12px; border-bottom: 1px solid #ddd;">${r.tribunal || ''}</td>
+                <td style="padding: 12px; border-bottom: 1px solid #ddd;">${r.description || ''}</td>
+                <td style="padding: 12px; border-bottom: 1px solid #ddd; text-align: center;">
+                  ${r.pdf_url ? `<a href="${r.pdf_url}" target="_blank">📄 PDF</a>` : "N/A"}
                 </td>
               </tr>`;
           });
@@ -183,7 +202,7 @@
           contentDiv.innerHTML = html;
 
         } catch (err) {
-          contentDiv.innerHTML = `<div class='card'><p class="error">Erreur de chargement des données.</p></div>`;
+          contentDiv.innerHTML = `<div class='card'><p class="error">Erreur de chargement.</p></div>`;
         }
       });
     });
