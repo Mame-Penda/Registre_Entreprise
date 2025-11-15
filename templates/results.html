@@ -154,6 +154,7 @@ iframe {
   <a href="#" id="bodacc-link"><i class="fas fa-chart-line"></i> Annonces et Publications</a>
   <a href="{{ url_for('articles') }}"><i class="fas fa-newspaper"></i> Articles</a>
   <a href="{{ url_for('about') }}"><i class="fas fa-info-circle"></i> À propos</a>
+  <a href="{{ url_for('mes_favoris') }}"><i class="fas fa-star"></i> Mes Favoris</a>
   <a href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> Se déconnecter</a>
 </nav>
   </aside>
@@ -335,15 +336,6 @@ alert('Erreur : ' + data.error);
     });
   </script>
 </body>
-<footer>
-      &copy; 2025 Registre Entreprise. Tous droits réservés.
-      <p>Suivez-nous</p>
-      <div class="social-links">
-        <a href="https://github.com" target="_blank"><i class="fab fa-github"></i></a>
-        <a href="https://linkedin.com" target="_blank"><i class="fab fa-linkedin"></i></a>
-        <a href="https://whatsapp.com" target="_blank"><i class="fab fa-whatsapp"></i></a>
-        <a href="https://x.com" target="_blank"><i class="fab fa-x-twitter"></i></a>
-      </div>
-    </footer>
+
 </html>
 
