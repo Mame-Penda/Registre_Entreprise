@@ -284,8 +284,9 @@ def search_company():
             return render_template("search.html",
                                    error=f"Erreur de connexion à l'API INSEE : {e}")
 
-     if resp.status_code == 200:
-    payload = resp.json()
+     
+    if resp.status_code == 200:
+     payload = resp.json()
     data = payload.get("etablissement") or payload.get("uniteLegale")
     if not data:
         return render_template("search.html", error="Réponse INSEE inattendue.")
