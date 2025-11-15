@@ -431,29 +431,31 @@ def dashboard():
     return render_template("dashboard.html", stats=stats, dernieres_recherches=dernieres_recherches)
 
 
-@app.route("/mes_favoris", methods=["GET"])
+@app.route('/mes_favoris')
 def mes_favoris():
+    """Afficher les favoris de l'utilisateur"""
+
+    # Sécurité : Render stocke "user" -> email dans la session
     if "user" not in session:
-        return redirect(url_for("login"))
-    
+        return redirect(url_for('login'))
+
     user_email = session["user"]
+
     conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    if DATABASE_URL:
-        cursor.execute(
-            "SELECT siret, nom_entreprise, date_ajout FROM favoris WHERE user_email = %s ORDER BY date_ajout DESC",
-            (user_email,)
-        )
-    else:
-        cursor.execute(
-            "SELECT siret, nom_entreprise, date_ajout FROM favoris WHERE user_email = ? ORDER BY date_ajout DESC",
-            (user_email,)
-        )
-    
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    cursor.execute("""
+        SELECT siret, nom_entreprise, date_ajout 
+        FROM favoris
+        WHERE user_email = %s
+        ORDER BY date_ajout DESC
+    """, (user_email,))
+
     favoris = cursor.fetchall()
+
+    cursor.close()
     conn.close()
-    
+
     return render_template("favoris.html", favoris=favoris)
 
 
