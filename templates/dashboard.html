@@ -68,7 +68,8 @@
           {% for rech in dernieres_recherches %}
           <div class="recherche-item">
             <h4>{{ rech[1] or 'Entreprise' }}</h4>
-            <p>SIRET: {{ rech[0] }} • Recherché le {{ rech[2][:10] if rech[2] else 'N/A' }}</p>
+            <p>SIRET: {{ rech[0] }} • Recherché le {{ rech[2].strftime('%Y-%m-%d') if rech[2] else 'N/A' }}</p>
+
           </div>
           {% endfor %}
         {% else %}
