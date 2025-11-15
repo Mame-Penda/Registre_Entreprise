@@ -444,7 +444,7 @@ def mes_favoris():
         print("📌 Utilisateur connecté :", user_email)
 
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cursor = conn.cursor()   # <- PAS de RealDictCursor
 
         print("📌 Exécution requête SQL")
         cursor.execute("""
@@ -454,12 +454,23 @@ def mes_favoris():
             ORDER BY date_ajout DESC
         """, (user_email,))
 
-        favoris = cursor.fetchall()
-        print("📌 Résultat SQL :", favoris)
+        rows = cursor.fetchall()
+        print("📌 Résultat brut :", rows)
 
         cursor.close()
         conn.close()
-        print("📌 Connexion fermée")
+
+        # Conversion en liste de dictionnaires (compatible template)
+        favoris = [
+            {
+                "siret": row[0],
+                "nom_entreprise": row[1],
+                "date_ajout": row[2]
+            }
+            for row in rows
+        ]
+
+        print("📌 Favoris formatés :", favoris)
 
         return render_template("favoris.html", favoris=favoris)
 

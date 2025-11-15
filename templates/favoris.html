@@ -42,7 +42,7 @@
   </aside>
 
   <div class="main-content">
-    <header><h1> Mes Favoris</h1></header>
+    <header><h1>Mes Favoris</h1></header>
 
     <div class="content">
       <div class="card">
@@ -50,31 +50,16 @@
         
         {% if favoris %}
           {% for fav in favoris %}
-          <div class="favori-item" id="fav-{{ fav.0 if fav is sequence else fav }}">
+          <div class="favori-item" id="fav-{{ fav.siret }}">
             <div class="favori-info">
-              <h4>
-                {% if fav is sequence %}
-                  {{ fav.1 or fav[1] or 'Entreprise' }}
-                {% else %}
-                  {{ fav or 'Entreprise' }}
-                {% endif %}
-              </h4>
+              <h4>{{ fav.nom_entreprise }}</h4>
               <p>
-                SIRET: 
-                {% if fav is sequence %}
-                  {{ fav.0 or fav[0] }}
-                {% else %}
-                  {{ fav }}
-                {% endif %}
-                • Ajouté le 
-                {% if fav is sequence and fav|length > 2 %}
-                  {{ (fav.2 or fav[2] or '')[:10] }}
-                {% else %}
-                  N/A
-                {% endif %}
+                SIRET : {{ fav.siret }} • 
+                Ajouté le {{ fav.date_ajout.strftime('%Y-%m-%d') }}
               </p>
             </div>
-            <button class="btn-supprimer" onclick="supprimerFavori('{% if fav is sequence %}{{ fav.0 or fav[0] }}{% else %}{{ fav }}{% endif %}')">
+
+            <button class="btn-supprimer" onclick="supprimerFavori('{{ fav.siret }}')">
               <i class="fas fa-trash"></i> Supprimer
             </button>
           </div>
