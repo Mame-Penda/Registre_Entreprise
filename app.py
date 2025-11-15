@@ -263,42 +263,53 @@ def about():
 
 @app.route("/", methods=["GET", "POST"])
 def search_company():
+    # Si utilisateur non connecté
     if "user" not in session:
         return redirect(url_for("login"))
 
-    if request.method == "POST":
-        siret = request.form.get("siret", "").strip()
+    # ---- REQUÊTE GET → afficher la page de recherche ----
+    if request.method == "GET":
+        return render_template("search.html")
 
-        if not siret.isdigit() or len(siret) != 14:
-            return render_template("search.html",
-                                   error="Numéro SIRET invalide. Il doit contenir 14 chiffres.")
+    # ---- REQUÊTE POST → traitement du SIRET ----
+    siret = request.form.get("siret", "").strip()
 
-        if not INSEE_API_KEY:
-            return render_template("search.html",
-                                   error="INSEE_API_KEY manquant. Ajoutez-le dans votre .env puis redémarrez l'app.")
+    if not siret.isdigit() or len(siret) != 14:
+        return render_template("search.html",
+                               error="Numéro SIRET invalide. Il doit contenir 14 chiffres.")
 
-        url = API_SIRENE_SIRET_URL.format(siret=siret)
-        try:
-            resp = requests.get(url, headers=insee_headers(), timeout=15)
-        except requests.RequestException as e:
-            return render_template("search.html",
-                                   error=f"Erreur de connexion à l'API INSEE : {e}")
+    if not INSEE_API_KEY:
+        return render_template("search.html",
+                               error="INSEE_API_KEY manquant. Ajoutez-le dans votre .env puis redémarrez l'app.")
 
-     
-    if resp.status_code == 200:
-     payload = resp.json()
+    # Appel API INSEE
+    url = API_SIRENE_SIRET_URL.format(siret=siret)
+
+    try:
+        resp = requests.get(url, headers=insee_headers(), timeout=15)
+    except requests.RequestException as e:
+        return render_template("search.html",
+                               error=f"Erreur de connexion à l'API INSEE : {e}")
+
+    # Si erreur API
+    if resp.status_code != 200:
+        return render_template("search.html",
+                               error="Entreprise introuvable dans l'API INSEE.")
+
+    payload = resp.json()
     data = payload.get("etablissement") or payload.get("uniteLegale")
+
     if not data:
         return render_template("search.html", error="Réponse INSEE inattendue.")
-    
-    # AJOUTEZ CE BLOC pour enregistrer l'historique
+
+    # ---- SAUVEGARDE DE L'HISTORIQUE ----
     try:
         nom_entreprise = data.get("uniteLegale", {}).get("denominationUniteLegale", "Entreprise")
         user_email = session.get("user")
-        
+
         conn = get_db_connection()
         cursor = conn.cursor()
-        
+
         if DATABASE_URL:
             cursor.execute(
                 "INSERT INTO historique (user_email, siret, nom_entreprise) VALUES (%s, %s, %s)",
@@ -309,14 +320,12 @@ def search_company():
                 "INSERT INTO historique (user_email, siret, nom_entreprise) VALUES (?, ?, ?)",
                 (user_email, siret, nom_entreprise)
             )
-        
+
         conn.commit()
         conn.close()
     except Exception as e:
         print(f"Erreur enregistrement historique: {e}")
-    
-    # FIN DU BLOC
-    
+
     has_articles = 'articles' in app.view_functions
     return render_template("results.html", data=data, has_articles=has_articles)
 
