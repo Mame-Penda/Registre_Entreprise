@@ -4,12 +4,12 @@ import secrets
 import json
 import re
 import traceback
+from datetime import timedelta
 from flask import Flask, request, render_template, redirect, url_for, session, flash, jsonify
 from flask_bcrypt import Bcrypt
 from flask_mail import Mail, Message
 from dotenv import load_dotenv
 import pymysql
-import traceback
 import sys
 
 # Active les logs détaillés
@@ -26,7 +26,7 @@ load_dotenv()
 # Configuration base de données
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
-# Initialiser la base de données au démarrage (init_db doit exister)
+# Initialiser la base de données au démarrage
 if DATABASE_URL:
     import psycopg2
     from init_db import init_database
@@ -45,8 +45,13 @@ else:
 app = Flask(__name__)
 app.config['DEBUG'] = True
 bcrypt = Bcrypt(app)
-# Si tu veux utiliser un secret déterministe en prod, mets FLASK_SECRET_KEY dans les envs
-app.secret_key = os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(16)
+
+# Configuration session sécurisée
+app.secret_key = os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
+app.config['SESSION_COOKIE_SECURE'] = False  # Mettre True en prod avec HTTPS
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 CLIENT_ID = os.getenv("CLIENT_ID", "").strip()
 CLIENT_SECRET = os.getenv("CLIENT_SECRET", "").strip()
@@ -116,6 +121,7 @@ def login():
 
         if user and bcrypt.check_password_hash(user[0], password):
             session["user"] = email
+            session.permanent = True  # Session permanente
             return redirect(url_for("search_company"))
         else:
             return render_template("login.html", error="Identifiants incorrects.")
@@ -168,6 +174,7 @@ def register():
 
         conn.close()
         session["user"] = phone or email
+        session.permanent = True  # Session permanente
         return redirect(url_for("search_company"))
 
     return render_template("register.html")
@@ -243,8 +250,9 @@ def reset_password():
 
 @app.route("/logout")
 def logout():
-    session.pop("user", None)
+    session.clear()
     return redirect(url_for("login"))
+
 
 @app.route('/articles')
 def articles():
@@ -260,18 +268,14 @@ def about():
     return render_template("about.html")
 
 
-
 @app.route("/", methods=["GET", "POST"])
 def search_company():
-    # Si utilisateur non connecté
     if "user" not in session:
         return redirect(url_for("login"))
 
-    # ---- REQUÊTE GET → afficher la page de recherche ----
     if request.method == "GET":
         return render_template("search.html")
 
-    # ---- REQUÊTE POST → traitement du SIRET ----
     siret = request.form.get("siret", "").strip()
 
     if not siret.isdigit() or len(siret) != 14:
@@ -280,9 +284,8 @@ def search_company():
 
     if not INSEE_API_KEY:
         return render_template("search.html",
-                               error="INSEE_API_KEY manquant. Ajoutez-le dans votre .env puis redémarrez l'app.")
+                               error="INSEE_API_KEY manquant.")
 
-    # Appel API INSEE
     url = API_SIRENE_SIRET_URL.format(siret=siret)
 
     try:
@@ -291,10 +294,9 @@ def search_company():
         return render_template("search.html",
                                error=f"Erreur de connexion à l'API INSEE : {e}")
 
-    # Si erreur API
     if resp.status_code != 200:
         return render_template("search.html",
-                               error="Entreprise introuvable dans l'API INSEE.")
+                               error="Entreprise introuvable.")
 
     payload = resp.json()
     data = payload.get("etablissement") or payload.get("uniteLegale")
@@ -302,7 +304,7 @@ def search_company():
     if not data:
         return render_template("search.html", error="Réponse INSEE inattendue.")
 
-    # ---- SAUVEGARDE DE L'HISTORIQUE ----
+    # Sauvegarde historique
     try:
         nom_entreprise = data.get("uniteLegale", {}).get("denominationUniteLegale", "Entreprise")
         user_email = session.get("user")
@@ -324,108 +326,42 @@ def search_company():
         conn.commit()
         conn.close()
     except Exception as e:
-        print(f"Erreur enregistrement historique: {e}")
+        print(f"Erreur historique: {e}")
 
     has_articles = 'articles' in app.view_functions
     return render_template("results.html", data=data, has_articles=has_articles)
 
 
-def generate_pdf_url(annonce):
-    """Construit une URL PDF BODACC robuste sans lever d'erreur 500."""
-    publicationavis = annonce.get("publicationavis") or "A"
-    parution = annonce.get("parution") or ""
-    numerodossier = str(annonce.get("numerodossier") or "0")
-
-    numero_annonce = annonce.get("numeroannonce")
-    if numero_annonce is None or not str(numero_annonce).isdigit():
-        numero_annonce_str = "00000"
-    else:
-        numero_annonce_str = str(numero_annonce).zfill(5)
-
-    annee = parution[:4] if len(parution) >= 4 else "0000"
-
-    base_url = (
-        f"https://www.bodacc.fr/telechargements/COMMERCIALES/PDF/"
-        f"{publicationavis}/{annee}/{parution}/"
-    )
-
-    url0 = (
-        f"{base_url}{numerodossier}/"
-        f"BODACC_{publicationavis}_PDF_Unitaire_{parution}_{numero_annonce_str}.pdf"
-    )
-
-    try:
-        if requests.head(url0, timeout=10).status_code == 200:
-            return url0
-    except Exception:
-        pass
-
-    try:
-        url1 = (
-            f"{base_url}1/"
-            f"BODACC_{publicationavis}_PDF_Unitaire_{parution}_{numero_annonce_str}.pdf"
-        )
-        if requests.head(url1, timeout=10).status_code == 200:
-            return url1
-    except Exception:
-        pass
-
-    return url0
-
-
 @app.route("/bodacc", methods=["GET"])
 def bodacc():
     try:
-        print("=" * 80)
-        print("🔍 DÉBUT BODACC")
-        print(f"Session user: {session.get('user')}")
-        print(f"Request args: {request.args}")
-        
         if "user" not in session:
-            print("❌ User not in session")
-            if request.accept_mimetypes.accept_json:
-                return jsonify({"error": "Non authentifié"}), 401
-            return redirect(url_for("login"))
+            return jsonify({"error": "Non authentifié"}), 401
 
         s = (request.args.get("siret") or request.args.get("siren") or "").strip()
-        print(f"📝 Paramètre reçu: '{s}'")
         
         if not s:
-            print("❌ Paramètre vide")
-            if request.accept_mimetypes.accept_json:
-                return jsonify({"error": "Paramètre 'siret' ou 'siren' manquant."}), 400
             return jsonify({"error": "Paramètre manquant"}), 400
 
-        # Validation
         if s.isdigit() and len(s) == 14:
             siren = s[:9]
-            print(f" SIRET 14 chiffres → SIREN: {siren}")
         elif s.isdigit() and len(s) == 9:
             siren = s
-            print(f" SIREN 9 chiffres: {siren}")
         else:
-            error_msg = f"Numéro invalide: {len(s)} chiffres"
-            print(f" {error_msg}")
-            return jsonify({"error": error_msg}), 400
+            return jsonify({"error": "Numéro invalide"}), 400
 
         url = f"https://bodacc-datadila.opendatasoft.com/api/records/1.0/search/?dataset=annonces-commerciales&q={siren}&rows=50"
-        print(f" URL API: {url}")
         
         results = []
         
-        print(" Appel API BODACC...")
         r = requests.get(url, timeout=20)
-        print(f" Status Code: {r.status_code}")
-        
         r.raise_for_status()
         data = r.json()
         records = data.get("records", [])
-        print(f" Nombre de records: {len(records)}")
         
         for rec in records:
             f = rec.get("fields", {})
             
-            # Traiter la description
             desc = f.get("modificationsgenerales", "")
             if desc:
                 try:
@@ -447,47 +383,16 @@ def bodacc():
                 "pdf_url": f.get("urlpdf", ""),
             })
         
-        print(f" {len(results)} résultats construits")
-        print("=" * 80)
-        
         return jsonify({"results": results})
         
     except Exception as e:
-        print("=" * 80)
-        print(f"❌❌❌ ERREUR CRITIQUE ❌❌❌")
-        print(f"Type: {type(e).__name__}")
-        print(f"Message: {str(e)}")
-        print("Traceback complet:")
+        print(f"ERREUR BODACC: {e}")
         traceback.print_exc()
-        print("=" * 80)
-        return jsonify({"error": f"Erreur serveur: {str(e)}"}), 500
-    
-@app.route('/dashboard/data')
-def dashboard_data():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    con = get_db_connection()
-    cursor = con.cursor(dictionary=True)
+        return jsonify({"error": str(e)}), 500
 
-    cursor.execute("SELECT COUNT(*) as total FROM favoris WHERE user_id = %s", (session['user_id'],))
-    nb_favoris = cursor.fetchone()['total']
-
-    cursor.execute("""
-                   SELECT * FROM favoris
-                   WHERE user_id = %s
-                   ORDER BY added_at DESC
-                   LIMIT 5
-                   """, (session['user_id'],))
-    derniers_favoris = cursor.fetchall()
-
-    con.close()
-    cursor.close()
-
-    return render_template('dashboard.html', nb_favoris=nb_favoris, derniers_favoris=derniers_favoris)
 
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
-    """Affiche le tableau de bord avec statistiques"""
     if "user" not in session:
         return redirect(url_for("login"))
     
@@ -495,24 +400,20 @@ def dashboard():
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Statistiques
     stats = {}
     
-    # Nombre de favoris
     if DATABASE_URL:
         cursor.execute("SELECT COUNT(*) FROM favoris WHERE user_email = %s", (user_email,))
     else:
         cursor.execute("SELECT COUNT(*) FROM favoris WHERE user_email = ?", (user_email,))
     stats['nb_favoris'] = cursor.fetchone()[0]
     
-    # Nombre de recherches
     if DATABASE_URL:
         cursor.execute("SELECT COUNT(*) FROM historique WHERE user_email = %s", (user_email,))
     else:
         cursor.execute("SELECT COUNT(*) FROM historique WHERE user_email = ?", (user_email,))
     stats['nb_recherches'] = cursor.fetchone()[0]
     
-    # Dernières recherches (5 dernières)
     if DATABASE_URL:
         cursor.execute(
             "SELECT siret, nom_entreprise, date_recherche FROM historique WHERE user_email = %s ORDER BY date_recherche DESC LIMIT 5",
@@ -529,118 +430,90 @@ def dashboard():
     
     return render_template("dashboard.html", stats=stats, dernieres_recherches=dernieres_recherches)
 
-@app.route('/favoris/add/<siren>', methods=['POST'])
-def add_favori(siren):
-    """Ajouter une entreprise aux favoris"""
-    
-    # Vérifier si l'utilisateur est connecté
-    if 'user_id' not in session:
-        return jsonify({'error': 'Non connecté'}), 401
 
-    user_id = session['user_id']
-
-    # Récupérer les infos de l'entreprise
-    entreprise = get_entreprise_by_siren(siren)
-    if not entreprise:
-        return jsonify({'error': 'Entreprise introuvable'}), 404
-
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    # Vérifier si le favori existe déjà
-    cursor.execute("""
-        SELECT 1 FROM favoris 
-        WHERE user_id = %s AND siren = %s
-    """, (user_id, siren))
-
-    if cursor.fetchone():
-        cursor.close()
-        conn.close()
-        return jsonify({'error': 'Déjà dans les favoris'}), 409
-
-    # Insérer dans favoris
-    cursor.execute("""
-        INSERT INTO favoris (user_id, siren, nom_entreprise)
-        VALUES (%s, %s, %s)
-    """, (user_id, siren, entreprise['nom']))
-
-    conn.commit()
-    cursor.close()
-    conn.close()
-
-    return jsonify({'success': True, 'message': 'Ajouté aux favoris'})
-
-
-@app.route('/favoris/remove/<siren>', methods=['POST'])
-def remove_favori(siren):
-    """Retirer une entreprise des favoris"""
-
-    # Vérifier si connecté
-    if 'user_id' not in session:
-        return jsonify({'error': 'Non connecté'}), 401
-
-    user_id = session['user_id']
-
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    # Supprimer le favori, retourner un élément si quelque chose a été supprimé
-    cursor.execute("""
-        DELETE FROM favoris
-        WHERE user_id = %s AND siren = %s
-        RETURNING id
-    """, (user_id, siren))
-
-    deleted = cursor.fetchone()
-
-    conn.commit()
-    cursor.close()
-    conn.close()
-
-    if not deleted:
-        return jsonify({'error': 'Favori introuvable'}), 404
-
-    return jsonify({'success': True, 'message': 'Retiré des favoris'})
-
-
-
-@app.route('/favoris')
+@app.route("/mes_favoris", methods=["GET"])
 def mes_favoris():
-    """Afficher les favoris de l'utilisateur"""
-
-    # Vérifier si connecté
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-
-    user_id = session['user_id']
-
+    if "user" not in session:
+        return redirect(url_for("login"))
+    
+    user_email = session["user"]
     conn = get_db_connection()
     cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT id, siren, nom_entreprise, created_at
-        FROM favoris
-        WHERE user_id = %s
-        ORDER BY created_at DESC
-    """, (user_id,))
-
-    # Récupérer les favoris
-    rows = cursor.fetchall()
-
-    # Transformer en dictionnaires (PostgreSQL ne renvoie pas du dict)
-    favoris = []
-    for r in rows:
-        favoris.append({
-            "id": r[0],
-            "siren": r[1],
-            "nom_entreprise": r[2],
-            "created_at": r[3]
-        })
-
-    cursor.close()
+    
+    if DATABASE_URL:
+        cursor.execute(
+            "SELECT siret, nom_entreprise, date_ajout FROM favoris WHERE user_email = %s ORDER BY date_ajout DESC",
+            (user_email,)
+        )
+    else:
+        cursor.execute(
+            "SELECT siret, nom_entreprise, date_ajout FROM favoris WHERE user_email = ? ORDER BY date_ajout DESC",
+            (user_email,)
+        )
+    
+    favoris = cursor.fetchall()
     conn.close()
-
+    
     return render_template("favoris.html", favoris=favoris)
+
+
+@app.route("/ajouter_favori", methods=["POST"])
+def ajouter_favori():
+    if "user" not in session:
+        return jsonify({"error": "Non authentifié"}), 401
+    
+    user_email = session["user"]
+    siret = request.json.get("siret")
+    nom_entreprise = request.json.get("nom_entreprise", "")
+    
+    if not siret:
+        return jsonify({"error": "SIRET manquant"}), 400
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        if DATABASE_URL:
+            cursor.execute(
+                "INSERT INTO favoris (user_email, siret, nom_entreprise) VALUES (%s, %s, %s)",
+                (user_email, siret, nom_entreprise)
+            )
+        else:
+            cursor.execute(
+                "INSERT INTO favoris (user_email, siret, nom_entreprise) VALUES (?, ?, ?)",
+                (user_email, siret, nom_entreprise)
+            )
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "Ajouté aux favoris"})
+    except Exception:
+        conn.close()
+        return jsonify({"error": "Déjà dans les favoris"}), 400
+
+
+@app.route("/supprimer_favori/<siret>", methods=["DELETE"])
+def supprimer_favori(siret):
+    if "user" not in session:
+        return jsonify({"error": "Non authentifié"}), 401
+    
+    user_email = session["user"]
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    if DATABASE_URL:
+        cursor.execute(
+            "DELETE FROM favoris WHERE user_email = %s AND siret = %s",
+            (user_email, siret)
+        )
+    else:
+        cursor.execute(
+            "DELETE FROM favoris WHERE user_email = ? AND siret = ?",
+            (user_email, siret)
+        )
+    
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True, "message": "Supprimé"})
 
 
 @app.route('/prospection', methods=['GET'])
@@ -648,17 +521,20 @@ def prospection():
     try:
         token = get_insee_token()
         if not token:
-            flash("Impossible d'obtenir un token INSEE (OAuth).", "error")
-            return redirect(url_for("bodacc"))
+            flash("Impossible d'obtenir un token INSEE.", "error")
+            return redirect(url_for("search_company"))
+        
         url = "https://api.insee.fr/entreprises/sirene/V3/siren"
         codes_naf = ["6201Z", "6202A", "6202B"]
         naf_query = " OR ".join([f"activitePrincipaleUniteLegale:{code}" for code in codes_naf])
         query = f"periode({naf_query})"
         params = {"q": query, "nombre": 100}
         headers = {"Authorization": f"Bearer {token}"}
+        
         resp = requests.get(url, headers=headers, params=params, timeout=20)
         resp.raise_for_status()
         data = resp.json()
+        
         entreprises = data.get("unitesLegales") or data.get("etablissements") or []
         results = []
         for ent in entreprises:
@@ -671,7 +547,7 @@ def prospection():
         return render_template("prospection.html", entreprises=results)
     except requests.RequestException as e:
         flash(f"Erreur API SIRENE : {e}", "error")
-        return redirect(url_for("bodacc"))
+        return redirect(url_for("search_company"))
 
 
 if __name__ == "__main__":
