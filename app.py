@@ -433,30 +433,39 @@ def dashboard():
 
 @app.route('/mes_favoris')
 def mes_favoris():
-    """Afficher les favoris de l'utilisateur"""
+    print("📌 DEBUG: entrée dans /mes_favoris")
 
-    # Sécurité : Render stocke "user" -> email dans la session
-    if "user" not in session:
-        return redirect(url_for('login'))
+    try:
+        if "user" not in session:
+            print("⚠️ Pas de session utilisateur, redirection login")
+            return redirect(url_for('login'))
 
-    user_email = session["user"]
+        user_email = session["user"]
+        print("📌 Utilisateur connecté :", user_email)
 
-    conn = get_db_connection()
-    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-    cursor.execute("""
-        SELECT siret, nom_entreprise, date_ajout 
-        FROM favoris
-        WHERE user_email = %s
-        ORDER BY date_ajout DESC
-    """, (user_email,))
+        print("📌 Exécution requête SQL")
+        cursor.execute("""
+            SELECT siret, nom_entreprise, date_ajout
+            FROM favoris
+            WHERE user_email = %s
+            ORDER BY date_ajout DESC
+        """, (user_email,))
 
-    favoris = cursor.fetchall()
+        favoris = cursor.fetchall()
+        print("📌 Résultat SQL :", favoris)
 
-    cursor.close()
-    conn.close()
+        cursor.close()
+        conn.close()
+        print("📌 Connexion fermée")
 
-    return render_template("favoris.html", favoris=favoris)
+        return render_template("favoris.html", favoris=favoris)
+
+    except Exception as e:
+        print("❌ ERREUR DANS /mes_favoris :", str(e))
+        return f"Erreur dans /mes_favoris : {e}", 500
 
 
 @app.route("/ajouter_favori", methods=["POST"])
