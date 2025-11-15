@@ -32,6 +32,7 @@
   <aside>
     <h2><i class="fas fa-user-circle"></i> Registre Entreprise</h2>
     <nav>
+      <a href="{{ url_for('dashboard') }}"><i class="fas fa-chart-bar"></i> Dashboard</a>
       <a href="{{ url_for('search_company') }}"><i class="fas fa-search"></i> Recherche</a>
       <a href="{{ url_for('mes_favoris') }}" class="active"><i class="fas fa-star"></i> Mes Favoris</a>
       <a href="{{ url_for('articles') }}"><i class="fas fa-newspaper"></i> Articles</a>
@@ -49,12 +50,31 @@
         
         {% if favoris %}
           {% for fav in favoris %}
-          <div class="favori-item" id="fav-{{ fav[0] }}">
+          <div class="favori-item" id="fav-{{ fav.0 if fav is sequence else fav }}">
             <div class="favori-info">
-              <h4>{{ fav[1] or 'Entreprise' }}</h4>
-              <p>SIRET: {{ fav[0] }} • Ajouté le {{ fav[2][:10] if fav[2] else 'N/A' }}</p>
+              <h4>
+                {% if fav is sequence %}
+                  {{ fav.1 or fav[1] or 'Entreprise' }}
+                {% else %}
+                  {{ fav or 'Entreprise' }}
+                {% endif %}
+              </h4>
+              <p>
+                SIRET: 
+                {% if fav is sequence %}
+                  {{ fav.0 or fav[0] }}
+                {% else %}
+                  {{ fav }}
+                {% endif %}
+                • Ajouté le 
+                {% if fav is sequence and fav|length > 2 %}
+                  {{ (fav.2 or fav[2] or '')[:10] }}
+                {% else %}
+                  N/A
+                {% endif %}
+              </p>
             </div>
-            <button class="btn-supprimer" onclick="supprimerFavori('{{ fav[0] }}')">
+            <button class="btn-supprimer" onclick="supprimerFavori('{% if fav is sequence %}{{ fav.0 or fav[0] }}{% else %}{{ fav }}{% endif %}')">
               <i class="fas fa-trash"></i> Supprimer
             </button>
           </div>
@@ -77,7 +97,6 @@
       try {
         const res = await fetch(`/supprimer_favori/${siret}`, { method: 'DELETE' });
         if (res.ok) {
-          document.getElementById(`fav-${siret}`).remove();
           location.reload();
         } else {
           alert('Erreur lors de la suppression');
