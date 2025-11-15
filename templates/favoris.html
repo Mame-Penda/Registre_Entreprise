@@ -1,0 +1,60 @@
+
+Mame Penda Sadio <mamependasadio1@gmail.com>
+02:18 (il y a 0 minute)
+À moi
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Mes Favoris - Registre Entreprise</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<header>
+<nav>
+<a href="/"> Accueil</a>
+<a href="/search"> Recherche</a>
+<a href="/favoris"> Mes Favoris</a>
+<a href="/dashboard"> Dashboard</a>
+</nav>
+</header>
+
+<main>
+<h1> Mes Entreprises Favorites</h1>
+{% if favoris %}
+<div class="favoris-grid">
+{% for fav in favoris %}
+<div class="favori-card">
+<h3>{{ fav.nom_entreprise }}</h3>
+<p>SIREN: {{ fav.siren }}</p>
+<p>Ajouté le: {{ fav.date_ajout.strftime('%d/%m/%Y') }}</p>
+<a href="/entreprise/{{ fav.siren }}" class="btn">Voir détails</a>
+<button onclick="retirerFavori('{{ fav.siren }}')" class="btn-danger">
+ Retirer
+</button>
+</div>
+{% endfor %}
+</div>
+{% else %}
+<p>Vous n'avez pas encore de favoris.</p>
+{% endif %}
+</main>
+
+<script>
+function retirerFavori(siren) {
+if (confirm('Retirer cette entreprise de vos favoris ?')) {
+fetch(`/favoris/remove/${siren}`, {
+method: 'POST'
+})
+.then(response => response.json())
+.then(data => {
+if (data.success) {
+location.reload();
+}
+});
+}
+}
+</script>
+</body>
+</html>

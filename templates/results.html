@@ -212,6 +212,34 @@ iframe {
 
       <div id="bodacc-results"></div>
     </div>
+    div class="entreprise-card">
+<h3>{{ entreprise.nom }}</h3>
+<p>SIREN: {{ entreprise.siren }}</p>
+<!-- Bouton Favoris -->
+<button class="btn-favori" onclick="toggleFavori('{{ entreprise.siren }}')">
+Ajouter aux favoris
+</button>
+</div>
+
+<script>
+function toggleFavori(siren) {
+fetch(`/favoris/add/${siren}`, {
+method: 'POST',
+headers: {
+'Content-Type': 'application/json'
+}
+})
+.then(response => response.json())
+.then(data => {
+if (data.success) {
+alert('Ajouté aux favoris !');
+} else {
+alert('Erreur : ' + data.error);
+}
+});
+}
+</script>
+
 
     <footer>
       &copy; 2025 Registre Entreprise. Tous droits réservés.

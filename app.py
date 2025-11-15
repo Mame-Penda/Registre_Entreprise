@@ -438,6 +438,142 @@ def bodacc():
         traceback.print_exc()
         print("=" * 80)
         return jsonify({"error": f"Erreur serveur: {str(e)}"}), 500
+    
+@app.route('/dashboard')
+def dashboard():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    con = get_db_connection()
+    cursor = con.cursor(dictionary=True)
+
+    cursor.execute("SELECT COUNT(*) as total FROM favoris WHERE user_id = %s", (session['user_id'],))
+    nb_favoris = cursor.fetchone()['total']
+
+    cursor.execute("""
+                   SELECT * FROM favoris
+                   WHERE user_id = %s
+                   ORDER BY added_at DESC
+                   LIMIT 5
+                   """, (session['user_id'],))
+    derniers_favoris = cursor.fetchall()
+
+    con.close()
+    cursor.close()
+
+    return render_template('dashboard.html', nb_favoris=nb_favoris, derniers_favoris=derniers_favoris)
+
+@app.route('/favoris/add/<siren>', methods=['POST'])
+def add_favori(siren):
+    """Ajouter une entreprise aux favoris"""
+    
+    # Vérifier si l'utilisateur est connecté
+    if 'user_id' not in session:
+        return jsonify({'error': 'Non connecté'}), 401
+
+    user_id = session['user_id']
+
+    # Récupérer les infos de l'entreprise
+    entreprise = get_entreprise_by_siren(siren)
+    if not entreprise:
+        return jsonify({'error': 'Entreprise introuvable'}), 404
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Vérifier si le favori existe déjà
+    cursor.execute("""
+        SELECT 1 FROM favoris 
+        WHERE user_id = %s AND siren = %s
+    """, (user_id, siren))
+
+    if cursor.fetchone():
+        cursor.close()
+        conn.close()
+        return jsonify({'error': 'Déjà dans les favoris'}), 409
+
+    # Insérer dans favoris
+    cursor.execute("""
+        INSERT INTO favoris (user_id, siren, nom_entreprise)
+        VALUES (%s, %s, %s)
+    """, (user_id, siren, entreprise['nom']))
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    return jsonify({'success': True, 'message': 'Ajouté aux favoris'})
+
+
+@app.route('/favoris/remove/<siren>', methods=['POST'])
+def remove_favori(siren):
+    """Retirer une entreprise des favoris"""
+
+    # Vérifier si connecté
+    if 'user_id' not in session:
+        return jsonify({'error': 'Non connecté'}), 401
+
+    user_id = session['user_id']
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Supprimer le favori, retourner un élément si quelque chose a été supprimé
+    cursor.execute("""
+        DELETE FROM favoris
+        WHERE user_id = %s AND siren = %s
+        RETURNING id
+    """, (user_id, siren))
+
+    deleted = cursor.fetchone()
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    if not deleted:
+        return jsonify({'error': 'Favori introuvable'}), 404
+
+    return jsonify({'success': True, 'message': 'Retiré des favoris'})
+
+
+
+@app.route('/favoris')
+def mes_favoris():
+    """Afficher les favoris de l'utilisateur"""
+
+    # Vérifier si connecté
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    user_id = session['user_id']
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, siren, nom_entreprise, created_at
+        FROM favoris
+        WHERE user_id = %s
+        ORDER BY created_at DESC
+    """, (user_id,))
+
+    # Récupérer les favoris
+    rows = cursor.fetchall()
+
+    # Transformer en dictionnaires (PostgreSQL ne renvoie pas du dict)
+    favoris = []
+    for r in rows:
+        favoris.append({
+            "id": r[0],
+            "siren": r[1],
+            "nom_entreprise": r[2],
+            "created_at": r[3]
+        })
+
+    cursor.close()
+    conn.close()
+
+    return render_template("favoris.html", favoris=favoris)
 
 
 @app.route('/prospection', methods=['GET'])
