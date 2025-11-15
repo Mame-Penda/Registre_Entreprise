@@ -1,16 +1,17 @@
 import os
 import psycopg2
+import sqlite3
 
 def init_database():
-    """Initialise la base de données PostgreSQL avec la table users"""
+    """Initialise la base de données avec users, favoris et historique"""
     database_url = os.environ.get('DATABASE_URL')
     
     if not database_url:
         print("❌ DATABASE_URL non définie. Utilisez SQLite en local.")
-        # Fallback SQLite pour développement local
-        import sqlite3
         conn = sqlite3.connect("users.db")
         cursor = conn.cursor()
+        
+        # Table users
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -21,6 +22,32 @@ def init_database():
                 password TEXT NOT NULL
             )
         ''')
+        
+        # Table favoris
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS favoris (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_email TEXT NOT NULL,
+                siret TEXT NOT NULL,
+                nom_entreprise TEXT,
+                date_ajout TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_email, siret),
+                FOREIGN KEY (user_email) REFERENCES users(email)
+            )
+        ''')
+        
+        # Table historique
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS historique (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_email TEXT NOT NULL,
+                siret TEXT NOT NULL,
+                nom_entreprise TEXT,
+                date_recherche TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_email) REFERENCES users(email)
+            )
+        ''')
+        
         conn.commit()
         conn.close()
         print("✓ Base de données SQLite initialisée (mode local)")
@@ -30,7 +57,7 @@ def init_database():
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
-        # Création de la table users pour PostgreSQL
+        # Table users
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -39,6 +66,31 @@ def init_database():
                 email VARCHAR(255) UNIQUE,
                 phone VARCHAR(20) UNIQUE,
                 password VARCHAR(255) NOT NULL
+            )
+        ''')
+        
+        # Table favoris
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS favoris (
+                id SERIAL PRIMARY KEY,
+                user_email VARCHAR(255) NOT NULL,
+                siret VARCHAR(14) NOT NULL,
+                nom_entreprise TEXT,
+                date_ajout TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_email, siret),
+                FOREIGN KEY (user_email) REFERENCES users(email) ON DELETE CASCADE
+            )
+        ''')
+        
+        # Table historique
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS historique (
+                id SERIAL PRIMARY KEY,
+                user_email VARCHAR(255) NOT NULL,
+                siret VARCHAR(14) NOT NULL,
+                nom_entreprise TEXT,
+                date_recherche TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_email) REFERENCES users(email) ON DELETE CASCADE
             )
         ''')
         

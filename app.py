@@ -284,27 +284,40 @@ def search_company():
             return render_template("search.html",
                                    error=f"Erreur de connexion à l'API INSEE : {e}")
 
-        if resp.status_code == 200:
-            payload = resp.json()
-            data = payload.get("etablissement") or payload.get("uniteLegale")
-            if not data:
-                return render_template("search.html", error="Réponse INSEE inattendue.")
-            has_articles = 'articles' in app.view_functions
-            return render_template("results.html", data=data, has_articles=has_articles)
-
-        elif resp.status_code == 404:
-            return render_template("search.html", error="Établissement non trouvé.")
-
+     if resp.status_code == 200:
+    payload = resp.json()
+    data = payload.get("etablissement") or payload.get("uniteLegale")
+    if not data:
+        return render_template("search.html", error="Réponse INSEE inattendue.")
+    
+    # AJOUTEZ CE BLOC pour enregistrer l'historique
+    try:
+        nom_entreprise = data.get("uniteLegale", {}).get("denominationUniteLegale", "Entreprise")
+        user_email = session.get("user")
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        if DATABASE_URL:
+            cursor.execute(
+                "INSERT INTO historique (user_email, siret, nom_entreprise) VALUES (%s, %s, %s)",
+                (user_email, siret, nom_entreprise)
+            )
         else:
-            try:
-                err_json = resp.json()
-                err_msg = err_json.get("message") or err_json
-            except ValueError:
-                err_msg = resp.text
-            return render_template("search.html",
-                                   error=f"Erreur API INSEE : {resp.status_code} – {err_msg}")
-
-    return render_template("search.html")
+            cursor.execute(
+                "INSERT INTO historique (user_email, siret, nom_entreprise) VALUES (?, ?, ?)",
+                (user_email, siret, nom_entreprise)
+            )
+        
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Erreur enregistrement historique: {e}")
+    
+    # FIN DU BLOC
+    
+    has_articles = 'articles' in app.view_functions
+    return render_template("results.html", data=data, has_articles=has_articles)
 
 
 def generate_pdf_url(annonce):
@@ -461,6 +474,50 @@ def dashboard():
     cursor.close()
 
     return render_template('dashboard.html', nb_favoris=nb_favoris, derniers_favoris=derniers_favoris)
+
+@app.route("/dashboard", methods=["GET"])
+def dashboard():
+    """Affiche le tableau de bord avec statistiques"""
+    if "user" not in session:
+        return redirect(url_for("login"))
+    
+    user_email = session["user"]
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Statistiques
+    stats = {}
+    
+    # Nombre de favoris
+    if DATABASE_URL:
+        cursor.execute("SELECT COUNT(*) FROM favoris WHERE user_email = %s", (user_email,))
+    else:
+        cursor.execute("SELECT COUNT(*) FROM favoris WHERE user_email = ?", (user_email,))
+    stats['nb_favoris'] = cursor.fetchone()[0]
+    
+    # Nombre de recherches
+    if DATABASE_URL:
+        cursor.execute("SELECT COUNT(*) FROM historique WHERE user_email = %s", (user_email,))
+    else:
+        cursor.execute("SELECT COUNT(*) FROM historique WHERE user_email = ?", (user_email,))
+    stats['nb_recherches'] = cursor.fetchone()[0]
+    
+    # Dernières recherches (5 dernières)
+    if DATABASE_URL:
+        cursor.execute(
+            "SELECT siret, nom_entreprise, date_recherche FROM historique WHERE user_email = %s ORDER BY date_recherche DESC LIMIT 5",
+            (user_email,)
+        )
+    else:
+        cursor.execute(
+            "SELECT siret, nom_entreprise, date_recherche FROM historique WHERE user_email = ? ORDER BY date_recherche DESC LIMIT 5",
+            (user_email,)
+        )
+    dernieres_recherches = cursor.fetchall()
+    
+    conn.close()
+    
+    return render_template("dashboard.html", stats=stats, dernieres_recherches=dernieres_recherches)
 
 @app.route('/favoris/add/<siren>', methods=['POST'])
 def add_favori(siren):
