@@ -1,83 +1,153 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Articles - Registre Entreprise</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Articles</title>
+
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;600&display=swap" rel="stylesheet">
-  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Poppins', sans-serif; background: #F1F5F9; color: #1E293B; }
-    .container { max-width: 1200px; margin: 0 auto; padding: 40px 20px; }
-    header { background: #2A6F97; color: white; padding: 20px; text-align: center; }
-    h1 { margin-bottom: 30px; }
-    .article { background: white; border-radius: 12px; padding: 30px; margin-bottom: 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-    .article h2 { color: #2A6F97; margin-bottom: 15px; }
-    .article p { line-height: 1.8; margin-bottom: 15px; }
-    .back-link { display: inline-block; margin-top: 20px; padding: 10px 20px; background: #2A6F97; color: white; text-decoration: none; border-radius: 6px; }
-    .back-link:hover { background: #1E5A7A; }
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: #f0f4f8;
+      margin: 0;
+      padding: 0;
+    }
+
+    header, footer {
+      background-color: #2a6f97;
+      color: white;
+      padding: 1rem;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 1.4rem;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .nav-links a {
+      color: white;
+      text-decoration: none;
+      padding: 0.4rem 0.8rem;
+      border-radius: 999px;
+      font-size: 0.9rem;
+      background: rgba(255,255,255,0.15);
+      transition: background-color 0.2s ease, transform 0.1s ease;
+    }
+
+    .nav-links a:hover {
+      background: rgba(255,255,255,0.3);
+      transform: translateY(-1px);
+    }
+
+    .nav-links a.active {
+      background: white;
+      color: #2a6f97;
+      font-weight: 600;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: auto;
+      padding: 2rem;
+    }
+
+    h2 {
+      color: #2a6f97;
+      margin-bottom: 1rem;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    li {
+      background: white;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    }
+
+    li strong {
+      font-size: 1.15rem;
+      color: #1e3a5f;
+    }
+
+    .summary {
+      color: #555;
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+
+    li a {
+      text-decoration: none;
+      color: #2a6f97;
+      transition: color 0.2s ease;
+    }
+
+    li a:hover {
+      color: #1e4e6a;
+    }
+
+    footer {
+      margin-top: 3rem;
+      text-align: center;
+    }
   </style>
 </head>
-<button class="theme-toggle" id="themeToggle"></button>
-
-<script>
-const themeToggle = document.getElementById('themeToggle');
-const html = document.documentElement;
-
-// Charger le thème sauvegardé
-const savedTheme = localStorage.getItem('theme') || 'light';
-html.setAttribute('data-theme', savedTheme);
-themeToggle.textContent = savedTheme === 'dark' ? '' : '';
-
-// Toggle theme
-themeToggle.addEventListener('click', () => {
-const currentTheme = html.getAttribute('data-theme');
-const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-html.setAttribute('data-theme', newTheme);
-localStorage.setItem('theme', newTheme);
-themeToggle.textContent = newTheme === 'dark' ? '' : '';
-});
-</script>
 <body>
-  <header>
-    <h1> Articles & Actualités</h1>
-  </header>
 
-  <div class="container">
-    <div class="article">
-      <h2>Bienvenue sur notre page Articles</h2>
-      <p>
-        Découvrez les dernières actualités et informations importantes concernant 
-        le registre des entreprises françaises et les nouvelles réglementations.
-      </p>
-    </div>
+<header>
+  <h1>Articles</h1>
 
-    <div class="article">
-      <h2>Les nouveautés de l'API Sirene 2025</h2>
-      <p>
-        L'INSEE a déployé de nouvelles fonctionnalités pour l'API Sirene permettant 
-        un accès plus rapide et plus complet aux données des entreprises. 
-        Ces améliorations incluent des temps de réponse optimisés et de nouveaux 
-        champs d'information disponibles.
-      </p>
-      <p><strong>Date de publication :</strong> Janvier 2025</p>
-    </div>
+  <nav class="nav-links">
+    <a href="{{ url_for('search_company') }}">Recherche</a>
+    <a href="{{ url_for('dashboard') }}">Dashboard</a>
+    <a href="{{ url_for('notes_page') }}">Notes</a>
+    <a href="{{ url_for('articles_page') }}" class="active">Articles</a>
+    <a href="{{ url_for('logout') }}">Déconnexion</a>
+  </nav>
+</header>
 
-    <div class="article">
-      <h2>Comprendre les annonces BODACC</h2>
-      <p>
-        Le Bulletin officiel des annonces civiles et commerciales (BODACC) publie 
-        les actes enregistrés au registre du commerce et des sociétés. 
-        Notre plateforme vous permet d'accéder facilement à ces informations 
-        pour suivre l'évolution des entreprises.
-      </p>
-      <p><strong>Date de publication :</strong> Novembre 2024</p>
-    </div>
+<div class="container">
 
-    <a href="{{ url_for('search_company') }}" class="back-link">
-      <i class="fas fa-arrow-left"></i> Retour à la recherche
-    </a>
-  </div>
+  <h2>Liste des articles</h2>
+
+  <ul>
+    {% for article in articles %}
+      <li>
+        <a href="{{ url_for('article_detail', article_id=article.id) }}">
+          <strong>{{ article.title }}</strong>
+        </a>
+        <p class="summary">{{ article.summary }}</p>
+      </li>
+    {% else %}
+      <li>Aucun article disponible.</li>
+    {% endfor %}
+  </ul>
+
+</div>
+
+<footer>
+  &copy; 2025 Registre Entreprises — Tous droits réservés.
+</footer>
+
 </body>
 </html>
