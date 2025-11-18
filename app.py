@@ -545,6 +545,13 @@ def dashboard():
     conn.close()
     return render_template("dashboard.html", stats={"nb_favoris": nb_favoris}, dernieres_recherches=dernieres_recherches)
 
+@app.route('/articles')
+def articles():
+    """Page affichant les articles et actualités"""
+    if 'user' not in session:
+        return redirect(url_for('login'))
+    
+    return render_template('articles.html')
 
 @app.route('/prospection', methods=['GET'])
 def prospection():
