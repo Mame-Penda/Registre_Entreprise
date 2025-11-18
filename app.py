@@ -104,38 +104,33 @@ def get_insee_token() -> str | None:
 
 def generate_pdf_url(annonce):
     """
-    Tente de reconstruire une URL PDF BODACC en dernier recours.
-    (pas obligatoire si source fournit pdf)
+    Génère une URL PDF BODACC sans vérification (pour éviter les timeouts).
+    Retourne l'URL la plus probable sans faire de requête HEAD.
     """
-    publicationavis = annonce.get("publicationavis") or "A"
-    parution = annonce.get("parution") or ""
-    numerodossier = str(annonce.get("numerodossier") or "0")
-    numero_annonce = annonce.get("numeroannonce")
-    if numero_annonce is None or not str(numero_annonce).isdigit():
-        numero_annonce_str = "00000"
-    else:
-        numero_annonce_str = str(numero_annonce).zfill(5)
-    annee = parution[:4] if len(parution) >= 4 else "0000"
-    base_url = (
-        f"https://www.bodacc.fr/telechargements/COMMERCIALES/PDF/"
-        f"{publicationavis}/{annee}/{parution}/"
-    )
-    url0 = (
-        f"{base_url}{numerodossier}/"
-        f"BODACC_{publicationavis}_PDF_Unitaire_{parution}_{numero_annonce_str}.pdf"
-    )
     try:
-        if requests.head(url0, timeout=6).status_code == 200:
-            return url0
-    except Exception:
-        pass
-    try:
-        url1 = f"{base_url}1/BODACC_{publicationavis}_PDF_Unitaire_{parution}_{numero_annonce_str}.pdf"
-        if requests.head(url1, timeout=6).status_code == 200:
-            return url1
-    except Exception:
-        pass
-    return url0
+        publicationavis = annonce.get("publicationavis") or "A"
+        parution = annonce.get("parution") or ""
+        numerodossier = str(annonce.get("numerodossier") or "1")
+        numero_annonce = annonce.get("numeroannonce")
+        
+        if numero_annonce is None or not str(numero_annonce).isdigit():
+            numero_annonce_str = "00000"
+        else:
+            numero_annonce_str = str(numero_annonce).zfill(5)
+        
+        annee = parution[:4] if len(parution) >= 4 else "0000"
+        base_url = (
+            f"https://www.bodacc.fr/telechargements/COMMERCIALES/PDF/"
+            f"{publicationavis}/{annee}/{parution}/"
+        )
+        
+        # Retourne l'URL la plus probable (avec dossier 1 par défaut)
+        # Sans vérification HEAD pour éviter les timeouts
+        url = f"{base_url}1/BODACC_{publicationavis}_PDF_Unitaire_{parution}_{numero_annonce_str}.pdf"
+        return url
+    except Exception as e:
+        logging.debug(f"Erreur génération URL PDF: {e}")
+        return None
 
 
 # -------------------------
@@ -326,67 +321,76 @@ def bodacc():
         return jsonify({"error": "Numéro SIREN/SIRET invalide."}), 400
 
     url = f"https://bodacc-datadila.opendatasoft.com/api/records/1.0/search/?dataset=annonces-commerciales&q={siren}&rows=50&sort=dateparution"
+    
     try:
         r = requests.get(url, timeout=20)
         r.raise_for_status()
     except requests.RequestException as e:
         logging.exception("Erreur récupération annonces BODACC")
-        if request.accept_mimetypes.accept_json:
-            return jsonify({"error": f"Erreur récupération annonces BODACC : {e}"}), 502
-        return render_template("bodacc.html", results=[], error=f"Erreur BODACC : {e}")
+        return jsonify({"error": f"Erreur récupération annonces BODACC : {str(e)}"}), 502
 
-    payload = r.json()
+    try:
+        payload = r.json()
+    except ValueError as e:
+        logging.error("Erreur parsing JSON BODACC")
+        return jsonify({"error": "Réponse invalide de l'API BODACC"}), 502
+
     records = payload.get("records", [])
     results = []
 
     for rec in records:
-        f = rec.get("fields", {}) or {}
-        # description robust
-        desc = f.get("modificationsgenerales") or f.get("description") or ""
-        if isinstance(desc, str) and desc.strip():
-            try:
-                j = json.loads(desc)
-                if isinstance(j, dict):
-                    desc = " | ".join(f"{k}: {v}" for k, v in j.items())
-            except Exception:
-                pass
-        elif isinstance(desc, dict):
-            desc = " | ".join(f"{k}: {v}" for k, v in desc.items())
-        else:
-            desc = desc or ""
+        try:
+            f = rec.get("fields", {}) or {}
+            
+            # Description robuste
+            desc = f.get("modificationsgenerales") or f.get("description") or ""
+            if isinstance(desc, str) and desc.strip():
+                try:
+                    j = json.loads(desc)
+                    if isinstance(j, dict):
+                        desc = " | ".join(f"{k}: {v}" for k, v in j.items())
+                except Exception:
+                    pass
+            elif isinstance(desc, dict):
+                desc = " | ".join(f"{k}: {v}" for k, v in desc.items())
+            else:
+                desc = str(desc) if desc else ""
 
-        # try many pdf fields
-        pdf_url = (
-            f.get("urlpdf") or
-            f.get("lienAnnonce") or
-            f.get("url") or
-            f.get("url_publication") or
-            f.get("fichierPdf") or
-            f.get("pdf") or
-            (f.get("liens") and isinstance(f.get("liens"), list) and f.get("liens")[0].get("url")) or
-            None
-        )
+            # Essayer plusieurs champs pour l'URL PDF
+            pdf_url = (
+                f.get("urlpdf") or
+                f.get("lienAnnonce") or
+                f.get("url") or
+                f.get("url_publication") or
+                f.get("fichierPdf") or
+                f.get("pdf") or
+                None
+            )
+            
+            # Si pas de PDF fourni, générer l'URL (sans vérification)
+            if not pdf_url:
+                try:
+                    pdf_url = generate_pdf_url(f)
+                except Exception as e:
+                    logging.debug(f"Erreur génération PDF: {e}")
+                    pdf_url = None
 
-        # fallback generator
-        if not pdf_url:
-            try:
-                pdf_url = generate_pdf_url(f)
-            except Exception:
+            # Vérifier que l'URL est autorisée
+            if pdf_url and not is_allowed_pdf(pdf_url):
+                logging.warning("pdf_url host not allowed: %s", pdf_url)
                 pdf_url = None
 
-        # if pdf_url exists but not allowed, we null it (prevent SSRF)
-        if pdf_url and not is_allowed_pdf(pdf_url):
-            logging.warning("pdf_url host not allowed: %s", pdf_url)
-            pdf_url = None
-
-        results.append({
-            "date_parution": f.get("dateparution") or f.get("date") or "",
-            "type_avis": f.get("typeavis_lib") or f.get("familleavis_lib") or f.get("typeavis") or "",
-            "tribunal": f.get("tribunal") or f.get("source") or "",
-            "reference": f.get("numeroannonce") or f.get("numeroannonce") or "",
-            "description": desc,
-            "pdf_url": pdf_url
-        })
+            results.append({
+                "date_parution": f.get("dateparution") or f.get("date") or "",
+                "type_avis": f.get("typeavis_lib") or f.get("familleavis_lib") or f.get("typeavis") or "",
+                "tribunal": f.get("tribunal") or f.get("source") or "",
+                "reference": str(f.get("numeroannonce") or ""),
+                "description": desc,
+                "pdf_url": pdf_url
+            })
+        except Exception as e:
+            logging.warning(f"Erreur traitement d'un enregistrement BODACC: {e}")
+            continue
 
     return jsonify({"results": results})
 
