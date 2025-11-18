@@ -567,6 +567,66 @@ def dashboard():
     conn.close()
     return render_template("dashboard.html", stats={"nb_favoris": nb_favoris}, dernieres_recherches=dernieres_recherches)
 
+@app.route('/historique')
+def historique():
+    """Page d'historique des recherches"""
+    if 'user' not in session:
+        return redirect(url_for('login'))
+    
+    user_email = session.get('user')
+    user_id = session.get('user_id')
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Nombre de recherches
+        if DATABASE_URL:
+            cursor.execute("SELECT COUNT(*) FROM historique WHERE user_email = %s", (user_email,))
+        else:
+            cursor.execute("SELECT COUNT(*) FROM historique WHERE user_email = ?", (user_email,))
+        nb_recherches = cursor.fetchone()[0]
+        
+        # Nombre de favoris
+        if DATABASE_URL:
+            cursor.execute("SELECT COUNT(*) FROM favoris WHERE user_id = %s", (user_id,))
+        else:
+            cursor.execute("SELECT COUNT(*) FROM favoris WHERE user_id = ?", (user_id,))
+        nb_favoris = cursor.fetchone()[0]
+        
+        # Toutes les recherches
+        if DATABASE_URL:
+            cursor.execute("""
+                SELECT siret, nom_entreprise, date_recherche 
+                FROM historique 
+                WHERE user_email = %s 
+                ORDER BY date_recherche DESC 
+                LIMIT 50
+            """, (user_email,))
+        else:
+            cursor.execute("""
+                SELECT siret, nom_entreprise, date_recherche 
+                FROM historique 
+                WHERE user_email = ? 
+                ORDER BY date_recherche DESC 
+                LIMIT 50
+            """, (user_email,))
+        dernieres_recherches = cursor.fetchall()
+        
+        stats = {
+            'nb_recherches': nb_recherches,
+            'nb_favoris': nb_favoris
+        }
+        
+        return render_template('historique.html', stats=stats, dernieres_recherches=dernieres_recherches)
+        
+    except Exception as e:
+        logging.exception("Erreur historique")
+        return render_template('historique.html', stats={'nb_recherches': 0, 'nb_favoris': 0}, dernieres_recherches=[])
+    finally:
+        cursor.close()
+        conn.close()
+
 
 @app.route('/prospection', methods=['GET'])
 def prospection():
