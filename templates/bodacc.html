@@ -3,19 +3,58 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Annonces et publications</title>
-
-  <!-- Font Awesome pour les icônes -->
+  <title>Annonces BODACC - Registre Entreprise</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;600;900&display=swap" rel="stylesheet">
 
   <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
     body {
       font-family: 'Poppins', sans-serif;
       background: #F1F5F9;
-      margin: 0;
-      padding: 24px;
       color: #1E293B;
+      padding: 24px;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #2A6F97 0%, #1E5A7A 100%);
+      color: white;
+      padding: 30px;
+      border-radius: 12px;
+      margin-bottom: 30px;
+      text-align: center;
+      box-shadow: 0 8px 24px rgba(42, 111, 151, 0.3);
+    }
+
+    .header h1 {
+      margin-bottom: 10px;
+      font-size: 2rem;
+    }
+
+    .header p {
+      opacity: 0.9;
+      font-size: 0.95rem;
+    }
+
+    .back-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: white;
+      color: #2A6F97;
+      padding: 10px 20px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      margin-bottom: 20px;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .back-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
 
     .result-card {
@@ -23,37 +62,135 @@
       border-radius: 12px;
       box-shadow: 0 8px 16px rgba(0,0,0,0.06);
       padding: 24px;
-      max-width: 1200px;
+      max-width: 1400px;
       margin: 0 auto;
     }
 
-    h2 {
-      color: #2a6f97;
-      margin-bottom: 20px;
+    .loading {
       text-align: center;
+      padding: 40px;
+      color: #64748b;
+    }
+
+    .loading i {
+      font-size: 3rem;
+      animation: spin 1s linear infinite;
+      color: #2A6F97;
+      display: block;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .error {
+      text-align: center;
+      padding: 40px;
+      color: #dc2626;
+      background: #fee2e2;
+      border-radius: 12px;
+      margin: 20px auto;
+      max-width: 600px;
+    }
+
+    .error i {
+      font-size: 2rem;
+      margin-bottom: 10px;
+      display: block;
+    }
+
+    .no-results {
+      text-align: center;
+      padding: 60px 20px;
+      color: #64748b;
+    }
+
+    .no-results i {
+      font-size: 4rem;
+      margin-bottom: 20px;
+      opacity: 0.3;
+      display: block;
+    }
+
+    .stats {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding: 15px;
+      background: #f8fafc;
+      border-radius: 8px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .stats-count {
+      font-weight: 600;
+      color: #2a6f97;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.95rem;
+      font-size: 0.9rem;
     }
 
-    th, td {
-      padding: 12px 10px;
-      border-bottom: 1px solid #ccc;
-      vertical-align: top;
-      text-align: left;
+    thead {
+      position: sticky;
+      top: 0;
+      background: white;
+      z-index: 10;
     }
 
     th {
-      background-color: #e0f0fb;
+      background: linear-gradient(135deg, #e0f0fb 0%, #d1e7f5 100%);
+      color: #2a6f97;
+      padding: 14px 12px;
+      font-weight: 600;
+      text-align: left;
+      border-bottom: 2px solid #2a6f97;
+    }
+
+    td {
+      padding: 14px 12px;
+      border-bottom: 1px solid #e2e8f0;
+      vertical-align: top;
+    }
+
+    tr:hover {
+      background: #f8fafc;
+    }
+
+    .date-cell {
+      white-space: nowrap;
+      font-weight: 600;
       color: #2a6f97;
     }
 
-    .pdf-button {
+    .type-badge {
       display: inline-block;
-      background-color: #2a6f97;
+      padding: 4px 12px;
+      background: #e0f0fb;
+      color: #2a6f97;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .description-cell {
+      max-width: 400px;
+      line-height: 1.5;
+      color: #475569;
+    }
+
+    .pdf-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: linear-gradient(135deg, #2a6f97 0%, #1E5A7A 100%);
       color: white;
       padding: 8px 16px;
       border: none;
@@ -61,125 +198,182 @@
       font-size: 0.85rem;
       font-weight: 600;
       text-decoration: none;
-      transition: background-color 0.3s ease, transform 0.2s ease;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 8px rgba(42, 111, 151, 0.3);
       cursor: pointer;
+      white-space: nowrap;
     }
 
     .pdf-button:hover {
-      background-color: #1b4f6a;
-      transform: scale(1.05);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(42, 111, 151, 0.4);
     }
 
-    .pdf-button i {
-      margin-right: 6px;
+    .pdf-button.unavailable {
+      background: #94a3b8;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    .pdf-button.unavailable:hover {
+      transform: none;
+      box-shadow: 0 2px 8px rgba(148, 163, 184, 0.3);
     }
 
     footer {
       text-align: center;
-      margin-top: 60px;
+      margin-top: 40px;
+      padding: 20px;
     }
 
-    #user-info {
-      font-weight: 600;
-      margin-bottom: 12px;
+    @media (max-width: 768px) {
+      body { padding: 12px; }
+      .header h1 { font-size: 1.5rem; }
+      table { font-size: 0.8rem; }
+      th, td { padding: 8px 6px; }
+      .description-cell { max-width: 200px; }
+      .stats { font-size: 0.85rem; }
     }
   </style>
 </head>
 <body>
 
+<div class="header">
+  <h1><i class="fas fa-newspaper"></i> Annonces BODACC</h1>
+  <p>Bulletin officiel des annonces civiles et commerciales</p>
+</div>
+
+<a href="{{ url_for('search_company') }}" class="back-button">
+  <i class="fas fa-arrow-left"></i> Retour à la recherche
+</a>
+
 <div class="result-card">
-  <h2>Annonces BODACC</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Date</th>
-        <th>Type</th>
-        <th>Tribunal</th>
-        <th>Référence</th>
-        <th>Description</th>
-        <th>PDF</th>
-      </tr>
-    </thead>
-    <tbody id="bodacc-table-body"></tbody>
-  </table>
+  <div id="loading" class="loading">
+    <i class="fas fa-spinner"></i>
+    <p>Chargement des annonces BODACC...</p>
+  </div>
+  
+  <div id="content" style="display: none;">
+    <div class="stats">
+      <span class="stats-count">
+        <i class="fas fa-file-alt"></i> 
+        <span id="results-count">0</span> annonce(s) trouvée(s)
+      </span>
+      <span style="color: #64748b; font-size: 0.85rem;">
+        SIRET: <strong id="siret-display"></strong>
+      </span>
+    </div>
+    
+    <div style="overflow-x: auto;">
+      <table>
+        <thead>
+          <tr>
+            <th style="min-width: 100px;">Date</th>
+            <th style="min-width: 150px;">Type d'avis</th>
+            <th style="min-width: 120px;">Tribunal</th>
+            <th style="min-width: 100px;">Référence</th>
+            <th style="min-width: 300px;">Description</th>
+            <th style="min-width: 120px; text-align: center;">Document</th>
+          </tr>
+        </thead>
+        <tbody id="bodacc-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="no-results" style="display: none;" class="no-results">
+    <i class="fas fa-inbox"></i>
+    <h3>Aucune annonce trouvée</h3>
+    <p>Il n'y a pas d'annonces BODACC pour ce SIRET.</p>
+  </div>
+
+  <div id="error" style="display: none;" class="error">
+    <i class="fas fa-exclamation-triangle"></i>
+    <h3>Erreur de chargement</h3>
+    <p id="error-message"></p>
+  </div>
 </div>
 
 <footer>
-  <p id="user-info"></p>
-  <button onclick="logoutUser()" class="pdf-button" style="background-color: #dc2626;">
+  <a href="{{ url_for('logout') }}" class="pdf-button" style="background: #dc2626;">
     <i class="fas fa-sign-out-alt"></i> Déconnexion
-  </button>
+  </a>
 </footer>
 
 <script>
-  function getUser() {
-    return sessionStorage.getItem('user') || '';
-  }
-
-  function setUser(user) {
-    sessionStorage.setItem('user', user);
-  }
-
-  function logoutUser() {
-    sessionStorage.removeItem('user');
-    window.location.reload(); // recharge pour forcer la reconnexion
-  }
-
-  function updateUserUI() {
-    const userInfo = document.getElementById('user-info');
-    const user = getUser();
-    if (user) {
-      userInfo.textContent = `Connecté en tant que : ${user}`;
-    } else {
-      userInfo.textContent = 'Non connecté';
-    }
-  }
-
-  function checkUser() {
-    let user = getUser();
-    if (!user) {
-      user = prompt("Veuillez entrer votre nom ou email pour vous connecter :");
-      if (user) {
-        setUser(user);
-        updateUserUI();
-      } else {
-        document.body.innerHTML = `<p style="text-align:center; color:red;">Aucun utilisateur connecté</p>`;
-        return false;
-      }
-    }
-    return true;
-  }
-
   async function loadBodacc(siret) {
+    const loading = document.getElementById('loading');
+    const content = document.getElementById('content');
+    const noResults = document.getElementById('no-results');
+    const error = document.getElementById('error');
+    const siretDisplay = document.getElementById('siret-display');
+    
+    siretDisplay.textContent = siret;
+
     try {
       const response = await fetch(`/bodacc?siret=${siret}`);
+      
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP ${response.status}: ${response.statusText}`);
+      }
+
       const data = await response.json();
+      
+      loading.style.display = 'none';
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      if (!data.results || data.results.length === 0) {
+        noResults.style.display = 'block';
+        return;
+      }
+
+      // Afficher le contenu
+      content.style.display = 'block';
+      document.getElementById('results-count').textContent = data.results.length;
 
       const tbody = document.getElementById('bodacc-table-body');
       tbody.innerHTML = '';
 
-      if (!data.results.length) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">Aucune annonce trouvée.</td></tr>`;
-        return;
-      }
-
       data.results.forEach(item => {
         const tr = document.createElement('tr');
 
-        const createCell = (text) => {
-          const td = document.createElement('td');
-          td.textContent = text || '';
-          return td;
-        };
+        // Date
+        const dateCell = document.createElement('td');
+        dateCell.className = 'date-cell';
+        dateCell.textContent = item.date_parution || 'N/A';
+        tr.appendChild(dateCell);
 
-        tr.appendChild(createCell(item.date_parution));
-        tr.appendChild(createCell(item.type_avis || item.type_document));
-        tr.appendChild(createCell(item.tribunal || item.source));
-        tr.appendChild(createCell(item.reference || item.numeroannonce));
-        tr.appendChild(createCell(item.description));
+        // Type
+        const typeCell = document.createElement('td');
+        const typeBadge = document.createElement('span');
+        typeBadge.className = 'type-badge';
+        typeBadge.textContent = item.type_avis || 'Non spécifié';
+        typeCell.appendChild(typeBadge);
+        tr.appendChild(typeCell);
 
+        // Tribunal
+        const tribunalCell = document.createElement('td');
+        tribunalCell.textContent = item.tribunal || 'N/A';
+        tr.appendChild(tribunalCell);
+
+        // Référence
+        const refCell = document.createElement('td');
+        refCell.textContent = item.reference || 'N/A';
+        tr.appendChild(refCell);
+
+        // Description
+        const descCell = document.createElement('td');
+        descCell.className = 'description-cell';
+        descCell.textContent = item.description || 'Aucune description disponible';
+        tr.appendChild(descCell);
+
+        // PDF
         const pdfCell = document.createElement('td');
+        pdfCell.style.textAlign = 'center';
+        
         if (item.pdf_url) {
           const link = document.createElement('a');
           link.href = item.pdf_url;
@@ -188,7 +382,11 @@
           link.innerHTML = '<i class="fas fa-file-pdf"></i> Voir PDF';
           pdfCell.appendChild(link);
         } else {
-          pdfCell.textContent = 'N/A';
+          const unavailable = document.createElement('span');
+          unavailable.className = 'pdf-button unavailable';
+          unavailable.innerHTML = '<i class="fas fa-times"></i> Non disponible';
+          unavailable.title = 'PDF non disponible pour cette annonce';
+          pdfCell.appendChild(unavailable);
         }
 
         tr.appendChild(pdfCell);
@@ -196,20 +394,23 @@
       });
 
     } catch (err) {
-      document.body.innerHTML = `<p style="text-align:center; color:red;">Erreur de chargement</p>`;
-      console.error(err);
+      loading.style.display = 'none';
+      error.style.display = 'block';
+      document.getElementById('error-message').textContent = err.message;
+      console.error('Erreur BODACC:', err);
     }
   }
 
-  // --- Initialisation ---
-  updateUserUI();
-  if (checkUser()) {
-    const siret = new URLSearchParams(window.location.search).get('siret');
-    if (siret) {
-      loadBodacc(siret);
-    } else {
-      document.body.innerHTML = `<p style="text-align:center; color:red;">Aucun SIRET fourni</p>`;
-    }
+  // Initialisation
+  const urlParams = new URLSearchParams(window.location.search);
+  const siret = urlParams.get('siret');
+
+  if (siret) {
+    loadBodacc(siret);
+  } else {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('error').style.display = 'block';
+    document.getElementById('error-message').textContent = 'Aucun SIRET fourni dans l\'URL. Veuillez effectuer une recherche d\'entreprise.';
   }
 </script>
 
