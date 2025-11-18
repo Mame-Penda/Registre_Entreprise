@@ -493,40 +493,58 @@ def remove_favori(siren):
 
 @app.route('/mes_favoris')
 def mes_favoris():
-    logging.debug("📌 DEBUG: entrée dans /mes_favoris")
+    """Page affichant les favoris de l'utilisateur"""
+    logging.debug(" DEBUG: entrée dans /mes_favoris")
+    
     if 'user_id' not in session:
-        logging.debug("📌 Utilisateur non connecté, redirection vers login")
+        logging.debug(" Utilisateur non connecté, redirection vers login")
         return redirect(url_for('login'))
+    
     user_id = session['user_id']
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    # For Postgres we want tuples then convert to dicts for template
-    if DATABASE_URL:
-        cursor.execute("SELECT id, siren, nom_entreprise, created_at FROM favoris WHERE user_id = %s ORDER BY created_at DESC", (user_id,))
-        rows = cursor.fetchall()
-        favoris = []
-        for r in rows:
-            favoris.append({
-                "id": r[0],
-                "siren": r[1],
-                "nom_entreprise": r[2],
-                "date_ajout": r[3]
-            })
-    else:
-        cursor.execute("SELECT id, siren, nom_entreprise, created_at FROM favoris WHERE user_id = ? ORDER BY created_at DESC", (user_id,))
-        rows = cursor.fetchall()
-        favoris = []
-        for r in rows:
-            favoris.append({
-                "id": r[0],
-                "siren": r[1],
-                "nom_entreprise": r[2],
-                "date_ajout": r[3]
-            })
-    cursor.close()
-    conn.close()
-    logging.debug("❌ ERREUR DANS /mes_favoris : none (si pas d'erreur précédent)")
-    return render_template("favoris.html", favoris=favoris)
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        if DATABASE_URL:
+            cursor.execute(
+                "SELECT id, siren, nom_entreprise, created_at FROM favoris WHERE user_id = %s ORDER BY created_at DESC",
+                (user_id,)
+            )
+            rows = cursor.fetchall()
+            favoris = []
+            for r in rows:
+                favoris.append({
+                    "id": r[0],
+                    "siren": r[1],
+                    "nom_entreprise": r[2],
+                    "date_ajout": r[3]
+                })
+        else:
+            cursor.execute(
+                "SELECT id, siren, nom_entreprise, created_at FROM favoris WHERE user_id = ? ORDER BY created_at DESC",
+                (user_id,)
+            )
+            rows = cursor.fetchall()
+            favoris = []
+            for r in rows:
+                favoris.append({
+                    "id": r[0],
+                    "siren": r[1],
+                    "nom_entreprise": r[2],
+                    "date_ajout": r[3]
+                })
+        
+        cursor.close()
+        conn.close()
+        
+        logging.debug(f" {len(favoris)} favoris trouvés pour user_id={user_id}")
+        return render_template("favoris.html", favoris=favoris)
+        
+    except Exception as e:
+        logging.exception(" ERREUR dans /mes_favoris")
+        flash("Erreur lors du chargement des favoris", "error")
+        return redirect(url_for('dashboard'))
 
 
 @app.route('/dashboard')
@@ -630,6 +648,113 @@ def forgot_password():
         return redirect(url_for('login'))
     
     return render_template('forgot_password.html')
+
+# -------------------------
+# Routes pour les Notes
+# -------------------------
+
+@app.route('/notes', methods=['GET', 'POST'])
+def notes_page():
+    """Page de gestion des notes personnelles"""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    user_id = session['user_id']
+    
+    # Ajouter une nouvelle note (POST)
+    if request.method == 'POST':
+        content = request.form.get('content', '').strip()
+        if content:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            try:
+                if DATABASE_URL:
+                    cursor.execute(
+                        "INSERT INTO notes (user_id, content) VALUES (%s, %s)",
+                        (user_id, content)
+                    )
+                else:
+                    cursor.execute(
+                        "INSERT INTO notes (user_id, content) VALUES (?, ?)",
+                        (user_id, content)
+                    )
+                conn.commit()
+                flash("Note ajoutée avec succès !", "success")
+            except Exception as e:
+                logging.error(f"Erreur ajout note: {e}")
+                flash("Erreur lors de l'ajout de la note.", "error")
+            finally:
+                cursor.close()
+                conn.close()
+            return redirect(url_for('notes_page'))
+    
+    # Récupérer toutes les notes de l'utilisateur (GET)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        if DATABASE_URL:
+            cursor.execute(
+                "SELECT id, content, created_at FROM notes WHERE user_id = %s ORDER BY created_at DESC",
+                (user_id,)
+            )
+            rows = cursor.fetchall()
+            notes = [{"id": r[0], "content": r[1], "created_at": r[2]} for r in rows]
+        else:
+            cursor.execute(
+                "SELECT id, content, created_at FROM notes WHERE user_id = ? ORDER BY created_at DESC",
+                (user_id,)
+            )
+            rows = cursor.fetchall()
+            notes = [{"id": r[0], "content": r[1], "created_at": r[2]} for r in rows]
+    except Exception as e:
+        logging.error(f"Erreur récupération notes: {e}")
+        notes = []
+    finally:
+        cursor.close()
+        conn.close()
+    
+    return render_template('notes.html', notes=notes)
+
+
+@app.route('/notes/delete/<int:note_id>', methods=['POST'])
+def delete_note(note_id):
+    """Supprimer une note"""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    user_id = session['user_id']
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Vérifier que la note appartient bien à l'utilisateur
+        if DATABASE_URL:
+            cursor.execute(
+                "DELETE FROM notes WHERE id = %s AND user_id = %s RETURNING id",
+                (note_id, user_id)
+            )
+            deleted = cursor.fetchone()
+        else:
+            cursor.execute(
+                "DELETE FROM notes WHERE id = ? AND user_id = ?",
+                (note_id, user_id)
+            )
+            deleted = cursor.rowcount > 0
+        
+        conn.commit()
+        
+        if deleted:
+            flash("Note supprimée avec succès !", "success")
+        else:
+            flash("Note introuvable ou non autorisée.", "error")
+    except Exception as e:
+        logging.error(f"Erreur suppression note: {e}")
+        flash("Erreur lors de la suppression.", "error")
+    finally:
+        cursor.close()
+        conn.close()
+    
+    return redirect(url_for('notes_page'))
 
 
 # -------------------------

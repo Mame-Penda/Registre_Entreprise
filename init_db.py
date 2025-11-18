@@ -7,7 +7,7 @@ def init_database():
     database_url = os.environ.get('DATABASE_URL')
     
     if not database_url:
-        print("❌ DATABASE_URL non définie. Utilisez SQLite en local.")
+        print(" DATABASE_URL non définie. Utilisez SQLite en local.")
         conn = sqlite3.connect("users.db")
         cursor = conn.cursor()
         
@@ -100,8 +100,32 @@ def init_database():
         print("✓ Base de données PostgreSQL initialisée avec succès")
         
     except Exception as e:
-        print(f"❌ Erreur initialisation PostgreSQL : {e}")
+        print(f" Erreur initialisation PostgreSQL : {e}")
         raise
+
+    # Dans votre fonction init_database(), ajoutez :
+
+# Table des notes
+if DATABASE_URL:
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS notes (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    """)
+else:
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    """)
 
 if __name__ == "__main__":
     init_database()
