@@ -549,23 +549,155 @@ def mes_favoris():
 
 @app.route('/dashboard')
 def dashboard():
+    """Dashboard avec statistiques réelles"""
     if 'user' not in session:
         return redirect(url_for('login'))
-    user_email = session['user']
+    
+    user_email = session.get('user')
+    user_id = session.get('user_id')
+    
     conn = get_db_connection()
     cursor = conn.cursor()
-    if DATABASE_URL:
-        cursor.execute("SELECT COUNT(*) FROM favoris WHERE user_email = %s", (user_email,))
-    else:
-        cursor.execute("SELECT COUNT(*) FROM favoris WHERE user_email = ?", (user_email,))
-    nb_favoris = cursor.fetchone()[0]
-    if DATABASE_URL:
-        cursor.execute("SELECT siret, nom_entreprise, date_recherche FROM historique WHERE user_email = %s ORDER BY date_recherche DESC LIMIT 5", (user_email,))
-    else:
-        cursor.execute("SELECT siret, nom_entreprise, date_recherche FROM historique WHERE user_email = ? ORDER BY date_recherche DESC LIMIT 5", (user_email,))
-    dernieres_recherches = cursor.fetchall()
-    conn.close()
-    return render_template("dashboard.html", stats={"nb_favoris": nb_favoris}, dernieres_recherches=dernieres_recherches)
+    
+    try:
+        # Nombre de favoris
+        if DATABASE_URL:
+            cursor.execute("SELECT COUNT(*) FROM favoris WHERE user_id = %s", (user_id,))
+        else:
+            cursor.execute("SELECT COUNT(*) FROM favoris WHERE user_id = ?", (user_id,))
+        nb_favoris = cursor.fetchone()[0]
+        
+        # Nombre total de recherches
+        if DATABASE_URL:
+            cursor.execute("SELECT COUNT(*) FROM historique WHERE user_email = %s", (user_email,))
+        else:
+            cursor.execute("SELECT COUNT(*) FROM historique WHERE user_email = ?", (user_email,))
+        total_recherches = cursor.fetchone()[0]
+        
+        # Recherches de la semaine (7 derniers jours)
+        if DATABASE_URL:
+            cursor.execute("""
+                SELECT COUNT(*) FROM historique 
+                WHERE user_email = %s 
+                AND date_recherche >= NOW() - INTERVAL '7 days'
+            """, (user_email,))
+        else:
+            cursor.execute("""
+                SELECT COUNT(*) FROM historique 
+                WHERE user_email = ? 
+                AND date_recherche >= datetime('now', '-7 days')
+            """, (user_email,))
+        recherches_semaine = cursor.fetchone()[0]
+        
+        # Recherches d'aujourd'hui
+        if DATABASE_URL:
+            cursor.execute("""
+                SELECT COUNT(*) FROM historique 
+                WHERE user_email = %s 
+                AND DATE(date_recherche) = CURRENT_DATE
+            """, (user_email,))
+        else:
+            cursor.execute("""
+                SELECT COUNT(*) FROM historique 
+                WHERE user_email = ? 
+                AND DATE(date_recherche) = DATE('now')
+            """, (user_email,))
+        recherches_jour = cursor.fetchone()[0]
+        
+        # Recherches par jour (7 derniers jours)
+        if DATABASE_URL:
+            cursor.execute("""
+                SELECT DATE(date_recherche) as jour, COUNT(*) as nb
+                FROM historique
+                WHERE user_email = %s
+                AND date_recherche >= NOW() - INTERVAL '7 days'
+                GROUP BY DATE(date_recherche)
+                ORDER BY jour DESC
+                LIMIT 7
+            """, (user_email,))
+        else:
+            cursor.execute("""
+                SELECT DATE(date_recherche) as jour, COUNT(*) as nb
+                FROM historique
+                WHERE user_email = ?
+                AND date_recherche >= datetime('now', '-7 days')
+                GROUP BY DATE(date_recherche)
+                ORDER BY jour DESC
+                LIMIT 7
+            """, (user_email,))
+        
+        recherches_data = cursor.fetchall()
+        
+        # Préparer les données pour le graphique (7 derniers jours)
+        from datetime import datetime, timedelta
+        jours_labels = []
+        jours_data = []
+        for i in range(6, -1, -1):
+            jour = (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
+            jours_labels.append(['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'][(datetime.now() - timedelta(days=i)).weekday()])
+            
+            # Trouver le nombre de recherches pour ce jour
+            count = 0
+            for r in recherches_data:
+                if str(r[0]) == jour:
+                    count = r[1]
+                    break
+            jours_data.append(count)
+        
+        recherches_par_jour = {
+            'labels': jours_labels,
+            'data': jours_data
+        }
+        
+        # 5 dernières recherches
+        if DATABASE_URL:
+            cursor.execute("""
+                SELECT siret, nom_entreprise, date_recherche 
+                FROM historique 
+                WHERE user_email = %s 
+                ORDER BY date_recherche DESC 
+                LIMIT 5
+            """, (user_email,))
+        else:
+            cursor.execute("""
+                SELECT siret, nom_entreprise, date_recherche 
+                FROM historique 
+                WHERE user_email = ? 
+                ORDER BY date_recherche DESC 
+                LIMIT 5
+            """, (user_email,))
+        dernieres_recherches = cursor.fetchall()
+        
+        stats = {
+            'nb_favoris': nb_favoris,
+            'total_recherches': total_recherches,
+            'recherches_semaine': recherches_semaine,
+            'recherches_jour': recherches_jour
+        }
+        
+        return render_template(
+            'dashboard.html',
+            stats=stats,
+            dernieres_recherches=dernieres_recherches,
+            recherches_par_jour=recherches_par_jour
+        )
+        
+    except Exception as e:
+        logging.exception("Erreur dashboard")
+        return render_template(
+            'dashboard.html', 
+            stats={
+                'nb_favoris': 0,
+                'total_recherches': 0,
+                'recherches_semaine': 0,
+                'recherches_jour': 0
+            }, 
+            dernieres_recherches=[], 
+            recherches_par_jour={'labels': [], 'data': []}
+        )
+    finally:
+        cursor.close()
+        conn.close()
 
 @app.route('/historique')
 def historique():
