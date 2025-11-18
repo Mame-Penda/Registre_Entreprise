@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Recherche Entreprise</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;600&display=swap" rel="stylesheet">
 
   <style>
     * {
@@ -18,28 +19,56 @@
       background: #000;
     }
 
+    /* MENU NAVIGATION */
     .top-nav {
       position: absolute;
       top: 0;
       width: 100%;
       padding: 20px 5%;
       display: flex;
-      justify-content: flex-end;
+      justify-content: space-between;
+      align-items: center;
       z-index: 10;
+      background: rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(10px);
     }
-    .connect-button {
-      background: rgba(255, 255, 255, 0.15);
-      padding: 10px 18px;
-      border-radius: 30px;
+
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: white;
       display: flex;
       align-items: center;
       gap: 10px;
-      color: white;
-      font-weight: 500;
-      transition: background 0.3s ease;
     }
-    .connect-button:hover {
-      background: rgba(255, 255, 255, 0.25);
+
+    .nav-links {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .nav-links a {
+      background: rgba(255, 255, 255, 0.15);
+      padding: 8px 16px;
+      border-radius: 30px;
+      color: white;
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 0.9rem;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .nav-links a:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: translateY(-2px);
+    }
+
+    .nav-links a.active {
+      background: #2a6f97;
     }
 
     .hero-search {
@@ -51,6 +80,7 @@
       text-align: center;
       overflow: hidden;
     }
+
     .video-wrapper {
       position: absolute;
       top: 0; left: 0;
@@ -58,30 +88,37 @@
       height: 100%;
       z-index: 1;
     }
+
     .background-video {
       width: 100%;
       height: 100%;
       object-fit: cover;
     }
+
     .hero-content {
       position: relative;
       z-index: 2;
-      padding: 20px;
+      padding: 40px;
       max-width: 700px;
-      background: rgba(0, 0, 0, 0.5);
-      border-radius: 12px;
-      backdrop-filter: blur(4px);
+      background: rgba(0, 0, 0, 0.6);
+      border-radius: 16px;
+      backdrop-filter: blur(10px);
       color: #fff;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     }
+
     .hero-content h1 {
-      font-size: 2.2rem;
+      font-size: 2.5rem;
       font-weight: 700;
       margin-bottom: 20px;
     }
+
     .hero-content p {
       font-size: 1.1rem;
       margin-bottom: 30px;
+      color: rgba(255, 255, 255, 0.9);
     }
+
     .search-form {
       display: flex;
       justify-content: center;
@@ -89,124 +126,161 @@
       gap: 10px;
       flex-wrap: wrap;
     }
+
     .search-form input {
-      padding: 14px 20px;
+      padding: 16px 24px;
       border: none;
-      border-radius: 8px;
-      width: 60%;
+      border-radius: 12px;
+      width: 65%;
       max-width: 400px;
       font-size: 1rem;
+      font-family: 'Poppins', sans-serif;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     }
+
+    .search-form input:focus {
+      outline: 2px solid #2a6f97;
+    }
+
     .search-form button {
-      padding: 14px;
-      background: #fff;
-      color: #333;
+      padding: 16px 24px;
+      background: #2a6f97;
+      color: white;
       border: none;
-      border-radius: 8px;
+      border-radius: 12px;
       font-size: 1.2rem;
       cursor: pointer;
-      transition: background 0.3s ease;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 12px rgba(42, 111, 151, 0.4);
     }
+
     .search-form button:hover {
-      background: #ddd;
+      background: #1f5576;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(42, 111, 151, 0.6);
+    }
+
+    .error-message {
+      background: #dc2626;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      margin-top: 20px;
+      display: inline-block;
     }
 
     .footer {
       text-align: center;
-      padding: 20px;
+      padding: 30px 20px;
       background: #111;
       color: #ccc;
     }
-    .footer .social-links {
-      margin: 10px 0;
-    }
-    .footer .social-links a {
-      margin: 0 10px;
-      font-size: 1.4rem;
-      color: #ccc;
-      transition: color 0.3s;
-    }
-    .footer .social-links a:hover {
-      color: #fff;
+
+    .social-links {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin: 16px 0;
     }
 
+    .social-links a {
+      width: 40px;
+      height: 40px;
+      background: #1f5a7a;
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s;
+      text-decoration: none;
+      font-size: 18px;
+    }
+
+    .social-links a:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+    }
+
+    .social-links a.github { background: #333; }
+    .social-links a.linkedin { background: #0077b5; }
+    .social-links a.whatsapp { background: #25D366; }
+    .social-links a.twitter { background: #1DA1F2; }
+
     @media (max-width: 768px) {
-      .hero-content h1 {
-        font-size: 1.6rem;
+      .top-nav {
+        flex-direction: column;
+        gap: 15px;
+        padding: 15px;
       }
+
+      .nav-links {
+        justify-content: center;
+      }
+
+      .nav-links a {
+        font-size: 0.8rem;
+        padding: 6px 12px;
+      }
+
+      .hero-content {
+        padding: 30px 20px;
+      }
+
+      .hero-content h1 {
+        font-size: 1.8rem;
+      }
+
       .hero-content p {
         font-size: 1rem;
       }
+
       .search-form {
         flex-direction: column;
+        width: 100%;
       }
+
       .search-form input,
       .search-form button {
         width: 100%;
       }
-          .social-links {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  margin: 16px 0;
-}
-
-.social-links a {
-  width: 40px;
-  height: 40px;
-  background: #1f5a7a;
-  color: white;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.3s;
-  text-decoration: none;
-  font-size: 18px;
-}
-
-.social-links a:hover {
-  background: #167185;
-}
-
-.social-links a.github { background: #333; }
-.social-links a.linkedin { background: #0077b5; }
-.social-links a.whatsapp { background: #25D366; }
-.social-links a.twitter { background: #1DA1F2; }
-
-  .btn-login { 
-      background: #2a6f97;
-      color: #fff;
-      font-weight: bold;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background 0.3s, box-shadow 0.3s;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-      width: 100%;
-      padding: 14px;
-      font-size: 1rem;
-      margin-top: 16px;
-
-    }
-    .btn-login:hover {
-      background: #1f5576;
-      box-shadow: 0 6px 16px rgba(0,0,0,0.16);
-    }
     }
   </style>
 </head>
 <body>
 
-  <!-- Barre de navigation -->
+  <!-- MENU DE NAVIGATION -->
   <header class="top-nav">
-    <a href="/login" class="connect-button">
-      <i class="fas fa-user-circle"></i>
-      <span>Déconnexion</span>
-    </a>
+    <div class="logo">
+      <i class="fas fa-building"></i>
+      Registre Entreprise
+    </div>
+    <nav class="nav-links">
+      <a href="{{ url_for('search_company') }}" class="active">
+        <i class="fas fa-search"></i> Recherche
+      </a>
+      <a href="{{ url_for('dashboard') }}">
+        <i class="fas fa-chart-line"></i> Dashboard
+      </a>
+      <a href="{{ url_for('historique') }}">
+        <i class="fas fa-history"></i> Historique
+      </a>
+      <a href="{{ url_for('mes_favoris') }}">
+        <i class="fas fa-star"></i> Favoris
+      </a>
+      <a href="{{ url_for('notes_page') }}">
+        <i class="fas fa-sticky-note"></i> Notes
+      </a>
+      <a href="{{ url_for('articles') }}">
+        <i class="fas fa-newspaper"></i> Articles
+      </a>
+      <a href="{{ url_for('logout') }}">
+        <i class="fas fa-sign-out-alt"></i> Déconnexion
+      </a>
+    </nav>
   </header>
 
-  <!-- Section principale -->
+  <!-- SECTION PRINCIPALE -->
   <section class="hero-search">
     <div class="video-wrapper">
       <video class="background-video" autoplay muted loop playsinline>
@@ -214,28 +288,51 @@
         Votre navigateur ne supporte pas les vidéos HTML5.
       </video>
     </div>
+    
     <div class="hero-content">
-      <h1>Recherchez par numéro SIRET</h1>
-      <p>Entrez un numéro SIRET pour accéder aux données de l'entreprise concernée.</p>
+      <h1>🔍 Recherchez par numéro SIRET</h1>
+      <p>Accédez aux informations officielles des entreprises françaises</p>
+      
+      {% if error %}
+        <div class="error-message">
+          <i class="fas fa-exclamation-triangle"></i> {{ error }}
+        </div>
+      {% endif %}
+      
       <form method="POST" class="search-form">
-        <input type="text" name="siret" placeholder="Numéro SIRET" required />
-        <button type="submit"><i class="fas fa-search"></i></button>
+        <input 
+          type="text" 
+          name="siret" 
+          placeholder="Ex: 12345678901234" 
+          pattern="[0-9]{14}"
+          maxlength="14"
+          required 
+        />
+        <button type="submit">
+          <i class="fas fa-search"></i>
+        </button>
       </form>
     </div>
   </section>
 
-  <!-- Pied de page -->
-   <footer class="footer">
-    <p>Suivez-nous</p>
-   <div class="social-links">
-  <a href="https://github.com" target="_blank" class="github"><i class="fab fa-github"></i></a>
-  <a href="https://linkedin.com" target="_blank" class="linkedin"><i class="fab fa-linkedin"></i></a>
-  <a href="https://whatsapp.com" target="_blank" class="whatsapp"><i class="fab fa-whatsapp"></i></a>
-  <a href="https://x.com" target="_blank" class="twitter"><i class="fab fa-twitter"></i></a>
-  </div>
-
+  <!-- PIED DE PAGE -->
+  <footer class="footer">
+    <p style="font-size: 1.1rem; margin-bottom: 10px;">Suivez-nous</p>
+    <div class="social-links">
+      <a href="https://github.com" target="_blank" class="github">
+        <i class="fab fa-github"></i>
+      </a>
+      <a href="https://linkedin.com" target="_blank" class="linkedin">
+        <i class="fab fa-linkedin"></i>
+      </a>
+      <a href="https://wa.me/" target="_blank" class="whatsapp">
+        <i class="fab fa-whatsapp"></i>
+      </a>
+      <a href="https://x.com" target="_blank" class="twitter">
+        <i class="fab fa-x-twitter"></i>
+      </a>
+    </div>
     <p>&copy; 2025 Registre Entreprise. Tous droits réservés.</p>
-    
   </footer>
 
 </body>

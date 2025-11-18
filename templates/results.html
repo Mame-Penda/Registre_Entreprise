@@ -39,13 +39,15 @@
   <aside>
     <h2><i class="fas fa-user-circle"></i> Registre Entreprise</h2>
     <nav>
-      <a href="{{ url_for('dashboard') }}"><i class="fas fa-chart-bar"></i> Dashboard</a>
-      <a href="{{ url_for('search_company') }}"><i class="fas fa-search"></i> Recherche</a>
-      <a href="#" id="bodacc-link"><i class="fas fa-chart-line"></i> Annonces BODACC</a>
-      <a href="{{ url_for('mes_favoris') }}"><i class="fas fa-star"></i> Mes Favoris</a>
-      <a href="{{ url_for('articles') }}"><i class="fas fa-newspaper"></i> Articles</a>
-      <a href="{{ url_for('about') }}"><i class="fas fa-info-circle"></i> À propos</a>
-      <a href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> Se déconnecter</a>
+   <nav class="nav-links">
+  <a href="{{ url_for('search_company') }}"><i class="fas fa-search"></i> Recherche</a>
+  <a href="{{ url_for('dashboard') }}"><i class="fas fa-chart-line"></i> Dashboard</a>
+  <a href="{{ url_for('historique') }}"><i class="fas fa-history"></i> Historique</a>
+  <a href="{{ url_for('mes_favoris') }}"><i class="fas fa-star"></i> Favoris</a>
+  <a href="{{ url_for('notes_page') }}"><i class="fas fa-sticky-note"></i> Notes</a>
+  <a href="{{ url_for('articles') }}"><i class="fas fa-newspaper"></i> Articles</a>
+  <a href="{{ url_for('about') }}"><i class="fas fa-info-circle"></i> À propos</a>
+  <a href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> Déconnexion</a>
     </nav>
   </aside>
 
