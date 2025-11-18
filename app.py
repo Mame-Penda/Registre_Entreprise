@@ -545,13 +545,6 @@ def dashboard():
     conn.close()
     return render_template("dashboard.html", stats={"nb_favoris": nb_favoris}, dernieres_recherches=dernieres_recherches)
 
-@app.route('/articles')
-def articles():
-    """Page affichant les articles et actualités"""
-    if 'user' not in session:
-        return redirect(url_for('login'))
-    
-    return render_template('articles.html')
 
 @app.route('/prospection', methods=['GET'])
 def prospection():
@@ -584,6 +577,60 @@ def prospection():
         return redirect(url_for("bodacc"))
 
 
+# -------------------------
+# Routes supplémentaires (Articles, À propos, Mot de passe oublié)
+# -------------------------
+
+@app.route('/articles')
+def articles():
+    """Page affichant les articles et actualités"""
+    if 'user' not in session:
+        return redirect(url_for('login'))
+    return render_template('articles.html')
+
+
+@app.route('/about')
+def about():
+    """Page À propos"""
+    if 'user' not in session:
+        return redirect(url_for('login'))
+    return render_template('about.html')
+
+
+@app.route('/forgot_password', methods=['GET', 'POST'])
+def forgot_password():
+    """Page de réinitialisation de mot de passe"""
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip()
+        if not email:
+            flash("Veuillez entrer votre adresse email.", "error")
+            return render_template('forgot_password.html')
+        
+        # Vérifier si l'utilisateur existe
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        if DATABASE_URL:
+            cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
+        else:
+            cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
+        user = cursor.fetchone()
+        conn.close()
+        
+        if user:
+            # TODO: Implémenter l'envoi d'email avec token de réinitialisation
+            flash("Un email de réinitialisation a été envoyé (fonctionnalité en développement).", "info")
+        else:
+            # Ne pas révéler si l'email existe ou non (sécurité)
+            flash("Si cet email existe, un lien de réinitialisation a été envoyé.", "info")
+        
+        return redirect(url_for('login'))
+    
+    return render_template('forgot_password.html')
+
+
+# -------------------------
+# Démarrage de l'application
+# -------------------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
