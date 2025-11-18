@@ -434,61 +434,80 @@ def add_favori(siren):
         return jsonify({'error': 'Non connecté'}), 401
     user_id = session['user_id']
 
-    # get_entreprise_by_siren must exist in your codebase. fallback: store minimal info
+    # Récupérer le nom de l'entreprise
     entreprise = {"nom": request.json.get("nom") if request.is_json else request.form.get("nom")} if request else None
-    # If you have a function get_entreprise_by_siren, use it:
-    try:
-        from helpers import get_entreprise_by_siren  # optionally
-        entreprise = get_entreprise_by_siren(siren)
-    except Exception:
-        pass
-
-    if not entreprise:
+    
+    if not entreprise or not entreprise.get("nom"):
         entreprise = {"nom": "Entreprise inconnue"}
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    # adapt query for sqlite vs postgres (psycopg2 returns tuple)
-    if DATABASE_URL:
-        cursor.execute("SELECT 1 FROM favoris WHERE user_id = %s AND siren = %s", (user_id, siren))
-    else:
-        cursor.execute("SELECT 1 FROM favoris WHERE user_id = ? AND siren = ?", (user_id, siren))
-    if cursor.fetchone():
+    
+    try:
+        # Vérifier si déjà en favoris (utiliser SIRET)
+        siret = siren + "00000" if len(siren) == 9 else siren  # Convertir SIREN en SIRET si nécessaire
+        
+        if DATABASE_URL:
+            cursor.execute("SELECT 1 FROM favoris WHERE user_id = %s AND siret = %s", (user_id, siret))
+        else:
+            cursor.execute("SELECT 1 FROM favoris WHERE user_id = ? AND siret = ?", (user_id, siret))
+        
+        if cursor.fetchone():
+            cursor.close()
+            conn.close()
+            return jsonify({'error': 'Déjà dans les favoris'}), 409
+
+        # Ajouter aux favoris (utiliser SIRET)
+        if DATABASE_URL:
+            cursor.execute("INSERT INTO favoris (user_id, siret, nom_entreprise) VALUES (%s, %s, %s)", 
+                          (user_id, siret, entreprise.get("nom")))
+        else:
+            cursor.execute("INSERT INTO favoris (user_id, siret, nom_entreprise) VALUES (?, ?, ?)", 
+                          (user_id, siret, entreprise.get("nom")))
+
+        conn.commit()
+        return jsonify({'success': True, 'message': 'Ajouté aux favoris'})
+        
+    except Exception as e:
+        logging.exception("Erreur ajout favori")
+        return jsonify({'error': 'Erreur lors de l\'ajout'}), 500
+    finally:
         cursor.close()
         conn.close()
-        return jsonify({'error': 'Déjà dans les favoris'}), 409
-
-    if DATABASE_URL:
-        cursor.execute("INSERT INTO favoris (user_id, siren, nom_entreprise) VALUES (%s, %s, %s)", (user_id, siren, entreprise.get("nom")))
-    else:
-        cursor.execute("INSERT INTO favoris (user_id, siren, nom_entreprise) VALUES (?, ?, ?)", (user_id, siren, entreprise.get("nom")))
-
-    conn.commit()
-    cursor.close()
-    conn.close()
-    return jsonify({'success': True, 'message': 'Ajouté aux favoris'})
 
 
 @app.route('/favoris/remove/<siren>', methods=['POST', 'DELETE'])
 def remove_favori(siren):
     if 'user_id' not in session:
         return jsonify({'error': 'Non connecté'}), 401
+    
     user_id = session['user_id']
+    siret = siren + "00000" if len(siren) == 9 else siren  # Convertir SIREN en SIRET si nécessaire
+    
     conn = get_db_connection()
     cursor = conn.cursor()
-    if DATABASE_URL:
-        # returning id works on postgres
-        cursor.execute("DELETE FROM favoris WHERE user_id = %s AND siren = %s RETURNING id", (user_id, siren))
-        deleted = cursor.fetchone()
-    else:
-        cursor.execute("DELETE FROM favoris WHERE user_id = ? AND siren = ?", (user_id, siren))
-        deleted = True  # sqlite doesn't return
-    conn.commit()
-    cursor.close()
-    conn.close()
-    if DATABASE_URL and not deleted:
-        return jsonify({'error': 'Favori introuvable'}), 404
-    return jsonify({'success': True, 'message': 'Retiré des favoris'})
+    
+    try:
+        if DATABASE_URL:
+            cursor.execute("DELETE FROM favoris WHERE user_id = %s AND siret = %s RETURNING id", (user_id, siret))
+            deleted = cursor.fetchone()
+        else:
+            cursor.execute("DELETE FROM favoris WHERE user_id = ? AND siret = ?", (user_id, siret))
+            deleted = cursor.rowcount > 0
+        
+        conn.commit()
+        
+        if DATABASE_URL and not deleted:
+            return jsonify({'error': 'Favori introuvable'}), 404
+        
+        return jsonify({'success': True, 'message': 'Retiré des favoris'})
+        
+    except Exception as e:
+        logging.exception("Erreur suppression favori")
+        return jsonify({'error': 'Erreur lors de la suppression'}), 500
+    finally:
+        cursor.close()
+        conn.close()
 
 
 @app.route('/mes_favoris')
@@ -516,7 +535,7 @@ def mes_favoris():
             for r in rows:
                 favoris.append({
                     "id": r[0],
-                    "siren": r[1][:9],  # Extraire les 9 premiers chiffres du SIRET pour avoir le SIREN
+                    "siren": r[1][:9],  # Extraire SIREN du SIRET
                     "nom_entreprise": r[2],
                     "date_ajout": r[3]
                 })
@@ -530,7 +549,7 @@ def mes_favoris():
             for r in rows:
                 favoris.append({
                     "id": r[0],
-                    "siren": r[1][:9],  # Extraire les 9 premiers chiffres
+                    "siren": r[1][:9],  # Extraire SIREN du SIRET
                     "nom_entreprise": r[2],
                     "date_ajout": r[3]
                 })
@@ -543,9 +562,8 @@ def mes_favoris():
         
     except Exception as e:
         logging.exception("❌ ERREUR dans /mes_favoris")
-        flash("Erreur lors du chargement des favoris", "error")
-        return redirect(url_for('dashboard'))
-
+        # Afficher la page avec un message d'erreur au lieu de rediriger
+        return render_template("favoris.html", favoris=[], error=str(e))
 
 @app.route('/dashboard')
 def dashboard():
@@ -717,6 +735,13 @@ def historique():
             cursor.execute("SELECT COUNT(*) FROM historique WHERE user_email = %s", (user_email,))
         else:
             cursor.execute("SELECT COUNT(*) FROM historique WHERE user_email = ?", (user_email,))
+        nb_recherches = cursor.fetchone()[0] if cursor.fetchone() is not None else 0
+        
+        # Remettre le curseur au début
+        if DATABASE_URL:
+            cursor.execute("SELECT COUNT(*) FROM historique WHERE user_email = %s", (user_email,))
+        else:
+            cursor.execute("SELECT COUNT(*) FROM historique WHERE user_email = ?", (user_email,))
         nb_recherches = cursor.fetchone()[0]
         
         # Nombre de favoris
@@ -754,7 +779,12 @@ def historique():
         
     except Exception as e:
         logging.exception("Erreur historique")
-        return render_template('historique.html', stats={'nb_recherches': 0, 'nb_favoris': 0}, dernieres_recherches=[])
+        # Retourner quand même la page avec des données vides
+        return render_template(
+            'historique.html', 
+            stats={'nb_recherches': 0, 'nb_favoris': 0}, 
+            dernieres_recherches=[]
+        )
     finally:
         cursor.close()
         conn.close()
