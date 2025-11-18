@@ -494,10 +494,10 @@ def remove_favori(siren):
 @app.route('/mes_favoris')
 def mes_favoris():
     """Page affichant les favoris de l'utilisateur"""
-    logging.debug(" DEBUG: entrée dans /mes_favoris")
+    logging.debug("📌 DEBUG: entrée dans /mes_favoris")
     
     if 'user_id' not in session:
-        logging.debug(" Utilisateur non connecté, redirection vers login")
+        logging.debug("📌 Utilisateur non connecté, redirection vers login")
         return redirect(url_for('login'))
     
     user_id = session['user_id']
@@ -508,7 +508,7 @@ def mes_favoris():
         
         if DATABASE_URL:
             cursor.execute(
-                "SELECT id, siren, nom_entreprise, created_at FROM favoris WHERE user_id = %s ORDER BY created_at DESC",
+                "SELECT id, siret, nom_entreprise, created_at FROM favoris WHERE user_id = %s ORDER BY created_at DESC",
                 (user_id,)
             )
             rows = cursor.fetchall()
@@ -516,13 +516,13 @@ def mes_favoris():
             for r in rows:
                 favoris.append({
                     "id": r[0],
-                    "siren": r[1],
+                    "siren": r[1][:9],  # Extraire les 9 premiers chiffres du SIRET pour avoir le SIREN
                     "nom_entreprise": r[2],
                     "date_ajout": r[3]
                 })
         else:
             cursor.execute(
-                "SELECT id, siren, nom_entreprise, created_at FROM favoris WHERE user_id = ? ORDER BY created_at DESC",
+                "SELECT id, siret, nom_entreprise, created_at FROM favoris WHERE user_id = ? ORDER BY created_at DESC",
                 (user_id,)
             )
             rows = cursor.fetchall()
@@ -530,7 +530,7 @@ def mes_favoris():
             for r in rows:
                 favoris.append({
                     "id": r[0],
-                    "siren": r[1],
+                    "siren": r[1][:9],  # Extraire les 9 premiers chiffres
                     "nom_entreprise": r[2],
                     "date_ajout": r[3]
                 })
@@ -538,11 +538,11 @@ def mes_favoris():
         cursor.close()
         conn.close()
         
-        logging.debug(f" {len(favoris)} favoris trouvés pour user_id={user_id}")
+        logging.debug(f"✅ {len(favoris)} favoris trouvés pour user_id={user_id}")
         return render_template("favoris.html", favoris=favoris)
         
     except Exception as e:
-        logging.exception(" ERREUR dans /mes_favoris")
+        logging.exception("❌ ERREUR dans /mes_favoris")
         flash("Erreur lors du chargement des favoris", "error")
         return redirect(url_for('dashboard'))
 
