@@ -430,47 +430,54 @@ def bodacc_view_pdf():
 # -------------------------
 @app.route('/favoris/add/<siren>', methods=['POST'])
 def add_favori(siren):
+    """Ajouter une entreprise aux favoris"""
     if 'user_id' not in session:
-        return jsonify({'error': 'Non connecté'}), 401
-    user_id = session['user_id']
-
-    # Récupérer le nom de l'entreprise
-    entreprise = {"nom": request.json.get("nom") if request.is_json else request.form.get("nom")} if request else None
+        return jsonify({'error': 'Non connecté', 'success': False}), 401
     
-    if not entreprise or not entreprise.get("nom"):
-        entreprise = {"nom": "Entreprise inconnue"}
-
+    user_id = session['user_id']
+    
+    # Récupérer le nom depuis le JSON
+    nom_entreprise = "Entreprise inconnue"
+    if request.is_json:
+        data = request.get_json()
+        nom_entreprise = data.get('nom', 'Entreprise inconnue')
+    elif request.form:
+        nom_entreprise = request.form.get('nom', 'Entreprise inconnue')
+    
+    # Convertir SIREN en SIRET (ajouter 5 zéros)
+    siret = siren + "00000" if len(siren) == 9 else siren
+    
     conn = get_db_connection()
     cursor = conn.cursor()
     
     try:
-        # Vérifier si déjà en favoris (utiliser SIRET)
-        siret = siren + "00000" if len(siren) == 9 else siren  # Convertir SIREN en SIRET si nécessaire
-        
+        # Vérifier si déjà en favoris
         if DATABASE_URL:
             cursor.execute("SELECT 1 FROM favoris WHERE user_id = %s AND siret = %s", (user_id, siret))
         else:
             cursor.execute("SELECT 1 FROM favoris WHERE user_id = ? AND siret = ?", (user_id, siret))
         
         if cursor.fetchone():
-            cursor.close()
-            conn.close()
-            return jsonify({'error': 'Déjà dans les favoris'}), 409
-
-        # Ajouter aux favoris (utiliser SIRET)
+            return jsonify({'error': 'Déjà dans les favoris', 'success': False}), 409
+        
+        # Ajouter aux favoris
         if DATABASE_URL:
-            cursor.execute("INSERT INTO favoris (user_id, siret, nom_entreprise) VALUES (%s, %s, %s)", 
-                          (user_id, siret, entreprise.get("nom")))
+            cursor.execute(
+                "INSERT INTO favoris (user_id, siret, nom_entreprise) VALUES (%s, %s, %s)",
+                (user_id, siret, nom_entreprise)
+            )
         else:
-            cursor.execute("INSERT INTO favoris (user_id, siret, nom_entreprise) VALUES (?, ?, ?)", 
-                          (user_id, siret, entreprise.get("nom")))
-
+            cursor.execute(
+                "INSERT INTO favoris (user_id, siret, nom_entreprise) VALUES (?, ?, ?)",
+                (user_id, siret, nom_entreprise)
+            )
+        
         conn.commit()
         return jsonify({'success': True, 'message': 'Ajouté aux favoris'})
         
     except Exception as e:
         logging.exception("Erreur ajout favori")
-        return jsonify({'error': 'Erreur lors de l\'ajout'}), 500
+        return jsonify({'error': f'Erreur serveur: {str(e)}', 'success': False}), 500
     finally:
         cursor.close()
         conn.close()
