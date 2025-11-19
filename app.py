@@ -513,10 +513,7 @@ def remove_favori(siren):
 @app.route('/mes_favoris')
 def mes_favoris():
     """Page affichant les favoris de l'utilisateur"""
-    logging.debug("📌 DEBUG: entrée dans /mes_favoris")
-    
     if 'user_id' not in session:
-        logging.debug("📌 Utilisateur non connecté, redirection vers login")
         return redirect(url_for('login'))
     
     user_id = session['user_id']
@@ -531,39 +528,24 @@ def mes_favoris():
                 (user_id,)
             )
             rows = cursor.fetchall()
-            favoris = []
-            for r in rows:
-                favoris.append({
-                    "id": r[0],
-                    "siren": r[1][:9],  # Extraire SIREN du SIRET
-                    "nom_entreprise": r[2],
-                    "date_ajout": r[3]
-                })
+            favoris = [{"id": r[0], "siren": r[1][:9], "nom_entreprise": r[2], "date_ajout": r[3]} for r in rows]
         else:
             cursor.execute(
                 "SELECT id, siret, nom_entreprise, created_at FROM favoris WHERE user_id = ? ORDER BY created_at DESC",
                 (user_id,)
             )
             rows = cursor.fetchall()
-            favoris = []
-            for r in rows:
-                favoris.append({
-                    "id": r[0],
-                    "siren": r[1][:9],  # Extraire SIREN du SIRET
-                    "nom_entreprise": r[2],
-                    "date_ajout": r[3]
-                })
+            favoris = [{"id": r[0], "siren": r[1][:9], "nom_entreprise": r[2], "date_ajout": r[3]} for r in rows]
         
         cursor.close()
         conn.close()
         
-        logging.debug(f"✅ {len(favoris)} favoris trouvés pour user_id={user_id}")
         return render_template("favoris.html", favoris=favoris)
         
     except Exception as e:
-        logging.exception("❌ ERREUR dans /mes_favoris")
-        # Afficher la page avec un message d'erreur au lieu de rediriger
-        return render_template("favoris.html", favoris=[], error=str(e))
+        logging.exception("ERREUR dans /mes_favoris")
+        # Afficher la page avec une liste vide au lieu de rediriger
+        return render_template("favoris.html", favoris=[])
 
 @app.route('/dashboard')
 def dashboard():
